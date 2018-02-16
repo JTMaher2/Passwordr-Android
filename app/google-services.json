@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "690176352805",
+    "firebase_url": "https://passwordr-3917b.firebaseio.com",
+    "project_id": "passwordr-3917b",
+    "storage_bucket": "passwordr-3917b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:690176352805:android:6e07398ca8816e90",
+        "android_client_info": {
+          "package_name": "io.github.jtmaher2.passwordr"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "690176352805-k6vcr75hebqm0nqajmo9qn12mmdno72g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.github.jtmaher2.passwordr",
+            "certificate_hash": "f7f3d443669437f429df0133901d94bccbbdc1ed"
+          }
+        },
+        {
+          "client_id": "690176352805-vhqedsjkc9i2qkjivucjntgphqcjf5jq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.github.jtmaher2.passwordr",
+            "certificate_hash": "bfd511bbbff8a1101488ccb8ec6f5ef40f36419f"
+          }
+        },
+        {
+          "client_id": "690176352805-hpmu8vloh0ov9tuj0ir9iraetoda6smq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCd5WZxwtVKFm3Rkiu2ujHc_2o2iyzlsLI"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "690176352805-hpmu8vloh0ov9tuj0ir9iraetoda6smq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
