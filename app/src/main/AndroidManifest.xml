@@ -16,9 +16,7 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".PasswordList"
-            android:label="@string/title_activity_password_list">
-
-        </activity>
+            android:label="@string/title_activity_password_list"></activity>
         <activity
             android:name=".LoginActivity"
             android:label="@string/title_activity_login">
@@ -27,6 +25,15 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name=".NewPasswordActivity"
+            android:label="@string/title_activity_new_password"
+            android:parentActivityName=".PasswordList"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="io.github.jtmaher2.passwordr.PasswordList" />
         </activity>
     </application>
 

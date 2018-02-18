@@ -6,9 +6,10 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
-import android.support.v4.widget.NestedScrollView;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
-import android.text.Editable;
+import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
 import android.view.View;
@@ -16,12 +17,13 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -42,11 +44,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import butterknife.internal.ListenerClass;
-
-import static android.text.InputType.TYPE_CLASS_TEXT;
-import static android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
-import static android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
 import static com.firebase.ui.auth.util.ExtraConstants.EXTRA_IDP_RESPONSE;
 
 public class PasswordList extends AppCompatActivity {
@@ -64,7 +61,6 @@ public class PasswordList extends AppCompatActivity {
     FirebaseFirestore mFirestore;
     private String mMasterPassword = "";
     private Context mContext;
-    private SignedInConfig mSignedInConfig;
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
 
     private static final String EXTRA_SIGNED_IN_CONFIG = "extra_signed_in_config";
@@ -91,6 +87,7 @@ public class PasswordList extends AppCompatActivity {
         Random rand = new Random();
         byte[] iv = new byte[IV_LEN];
         rand.nextBytes(iv);
+
         String encryptedString = "";
 
         try {
@@ -102,9 +99,24 @@ public class PasswordList extends AppCompatActivity {
 
             // encrypt
             byte[] encrypted = c.doFinal(field.getBytes());
+
+            // combine IV + encrypted field together
+            byte[] ivEncrypted = new byte[IV_LEN + encrypted.length];
+            for (int i = 0; i < ivEncrypted.length; i++) {
+                if (i < IV_LEN) {
+                    ivEncrypted[i] = iv[i];
+                } else {
+                    ivEncrypted[i] = encrypted[i - IV_LEN];
+                }
+            }
+
+            // convert to string
             StringBuilder output = new StringBuilder();
-            for (byte encryptedByte : encrypted) {
-                output.append(encryptedByte).append(",");
+            for (int encryptedByte = 0; encryptedByte < ivEncrypted.length; encryptedByte++) {
+                output.append(ivEncrypted[encryptedByte]);
+                if (encryptedByte < ivEncrypted.length - 1) {
+                    output.append(",");
+                }
             }
             encryptedString = output.toString();
         } catch (Exception e) {
@@ -154,7 +166,7 @@ public class PasswordList extends AppCompatActivity {
                 View item = thisPassword.getChildAt(itemPos);
 
                 // if it's not the edit button itself
-                if (item.getId() != EDIT_BUTTON) {
+                if (item.getId() != EDIT_BUTTON && item.getId() != PASSWORD_ID) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
                         View layoutItemView = itemViewGroup.getChildAt(layoutItem);
@@ -174,7 +186,7 @@ public class PasswordList extends AppCompatActivity {
                             itemViewGroup.addView(editableItem);
                         }
                     }
-                } else {
+                } else if (item.getId() == EDIT_BUTTON){
                     final Button itemButton = (Button)item;
 
                     itemButton.setText(R.string.done);
@@ -191,6 +203,7 @@ public class PasswordList extends AppCompatActivity {
         public void onClick(View view) {
             // save changes
             Map<String, Object> newPassword = new HashMap<>();
+            newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
             String key = ""; // the key that uniquely identifies this password
             ViewGroup thisPassword = (ViewGroup)view.getParent();
 
@@ -247,12 +260,24 @@ public class PasswordList extends AppCompatActivity {
                 }
             }
 
-            // upload to Firebase
-            DocumentReference doc = FirebaseFirestore.getInstance().collection("passwords").document(key);
-            doc.update(newPassword);
+            // overwrite existing password
+            mFirestore.collection("passwords").document(key)
+                    .set(newPassword)
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Log.w(TAG, "Error writing document", e);
+                        }
+                    });
 
             ((Button)view).setText(R.string.edit); // change text back to normal
-            ((Button)view).setOnClickListener(editPasswordListener); // revert listener to normal
+            view.setOnClickListener(editPasswordListener); // revert listener to normal
         }
     };
 
@@ -275,7 +300,9 @@ public class PasswordList extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_password_list);
-
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(getString(R.string.passwords));
+        }
         FirebaseApp.initializeApp(this);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         mContext = this;
@@ -290,7 +317,7 @@ public class PasswordList extends AppCompatActivity {
         while (sb.length() < MASTER_PASSWORD_LENGTH) {
             sb.append("0");
         }
-        while (sb.length() > 32) {
+        while (sb.length() > MASTER_PASSWORD_LENGTH) {
             sb.delete(sb.length() - 1, sb.length());
         }
         mMasterPassword = sb.toString();
@@ -377,6 +404,12 @@ public class PasswordList extends AppCompatActivity {
                                 editButton.setOnClickListener(editPasswordListener);
                                 passwordCard.addView(editButton);
 
+                                // Password ID
+                                TextView passwordID = new TextView(mContext);
+                                passwordID.setText(document.getId());
+                                passwordID.setId(PASSWORD_ID);
+                                passwordCard.addView(passwordID);
+
                                 passwordsLayout.addView(passwordCard);
                             }
                         } else {
@@ -384,6 +417,16 @@ public class PasswordList extends AppCompatActivity {
                         }
                     }
                 });
+
+            FloatingActionButton newPasswordBtn = findViewById(R.id.new_password_btn);
+            newPasswordBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    // take user to new password activity
+                    startActivity(NewPasswordActivity.createIntent(mContext, mMasterPassword));
+                    finish();
+                }
+            });
         } else {
             startActivity(LoginActivity.createIntent(this));
             finish();
@@ -398,12 +441,6 @@ public class PasswordList extends AppCompatActivity {
         int length = Math.min(passwordBytes.length, keyBytes.length);
         System.arraycopy(passwordBytes, 0, keyBytes, 0, length);
         return new SecretKeySpec(keyBytes, "GCM");
-    }
-
-    private void addPassword() {
-        final DocumentReference docRef = mFirestore.collection("passwords").document();
-
-
     }
 
     static final class SignedInConfig implements Parcelable {

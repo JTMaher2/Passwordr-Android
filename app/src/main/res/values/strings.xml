@@ -120,5 +120,13 @@
     <string name="show">Show</string>
     <string name="edit">Edit</string>
     <string name="note">Note:</string>
+    <string name="note_without_colon">Note</string>
     <string name="done">DONE</string>
+    <string name="title_activity_new_password">NewPasswordActivity</string>
+    <string name="name">Name</string>
+    <string name="url">URL</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="generate">Generate</string>
+    <string name="passwords">Passwords</string>
 </resources>
