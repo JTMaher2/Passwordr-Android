@@ -9,6 +9,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 
 import com.google.android.gms.tasks.OnFailureListener;
@@ -29,6 +30,7 @@ public class NewPasswordActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TAG = "NewPasswordActivity";
     private static final int IV_LEN = 12;
+    private static final int GEN_PASSWORD_LENGTH = 20;
     private static final int MASTER_PASSWORD_LENGTH = 32;
     private String mMasterPassword;
     private Context mContext;
@@ -102,6 +104,29 @@ public class NewPasswordActivity extends AppCompatActivity {
         return encryptedString;
     }
 
+    // generates a PASSWORD_LEN long password with a certain number of letters, numbers, and symbols
+    private String generatePassword() {
+        String string = "abcdefghijklmnopqrstuvwxyz"; //to upper
+        String numeric = "0123456789";
+        String punctuation = "!@#$%^&*()_+~`|}{[]\\:;?><,./-=";
+        String password = "";
+        String character = "";
+
+        while( password.length()<GEN_PASSWORD_LENGTH ) {
+            double entity1 = Math.ceil(string.length() * Math.random()*Math.random());
+            double entity2 = Math.ceil(numeric.length() * Math.random()*Math.random());
+            double entity3 = Math.ceil(punctuation.length() * Math.random()*Math.random());
+            char hold = string.charAt( (int)entity1 );
+            hold = (entity1%2==0)?(Character.toUpperCase(hold)):(hold);
+            character += hold;
+            character += numeric.charAt( (int)entity2 );
+            character += punctuation.charAt( (int)entity3 );
+            password = character;
+        }
+
+        return password;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -109,6 +134,12 @@ public class NewPasswordActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setTitle("New Password");
         setSupportActionBar(toolbar);
+
+        final EditText nameEditText = findViewById(R.id.nameEditText),
+                urlEditText = findViewById(R.id.urlEditText),
+                passwordEditText = findViewById(R.id.passwordEditText),
+                confirmPasswordEditText = findViewById(R.id.confirmPasswordEditText),
+                noteEditText = findViewById(R.id.noteEditText);
 
         mAuth = FirebaseAuth.getInstance();
         mFirestore = FirebaseFirestore.getInstance();
@@ -133,12 +164,6 @@ public class NewPasswordActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 // encrypt and save password
-                EditText nameEditText = findViewById(R.id.nameEditText),
-                        urlEditText = findViewById(R.id.urlEditText),
-                        passwordEditText = findViewById(R.id.passwordEditText),
-                        confirmPasswordEditText = findViewById(R.id.confirmPasswordEditText),
-                        noteEditText = findViewById(R.id.noteEditText);
-
                 if (passwordEditText.getText().toString().equals(confirmPasswordEditText.getText().toString())) {
                     Map<String, Object> newPassword = new HashMap<>();
                     newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
@@ -168,6 +193,16 @@ public class NewPasswordActivity extends AppCompatActivity {
                             });
                 }
 
+            }
+        });
+
+        Button genPasswordBtn = findViewById(R.id.generatePasswordBtn);
+        genPasswordBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String newPassword = generatePassword();
+                passwordEditText.setText(newPassword);
+                confirmPasswordEditText.setText(newPassword);
             }
         });
 

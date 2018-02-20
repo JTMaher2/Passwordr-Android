@@ -126,7 +126,7 @@
     <string name="name">Name</string>
     <string name="url">URL</string>
     <string name="password">Password</string>
-    <string name="confirm_password">Confirm Password</string>
+    <string name="confirm_password">Confirm</string>
     <string name="generate">Generate</string>
     <string name="passwords">Passwords</string>
 </resources>

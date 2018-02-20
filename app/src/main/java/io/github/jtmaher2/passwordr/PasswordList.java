@@ -9,6 +9,7 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AppCompatDelegate;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
@@ -62,8 +63,8 @@ public class PasswordList extends AppCompatActivity {
     private String mMasterPassword = "";
     private Context mContext;
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
-
     private static final String EXTRA_SIGNED_IN_CONFIG = "extra_signed_in_config";
+
     public static Intent createIntent(
             Context context,
             IdpResponse idpResponse,
@@ -303,6 +304,18 @@ public class PasswordList extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(getString(R.string.passwords));
         }
+
+        Toolbar toolbar = findViewById(R.id.password_list_toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setNavigationIcon(android.support.v7.appcompat.R.drawable.abc_ic_ab_back_material);
+        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                onBackPressed();
+            }
+        });
+
         FirebaseApp.initializeApp(this);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         mContext = this;
@@ -441,6 +454,13 @@ public class PasswordList extends AppCompatActivity {
         int length = Math.min(passwordBytes.length, keyBytes.length);
         System.arraycopy(passwordBytes, 0, keyBytes, 0, length);
         return new SecretKeySpec(keyBytes, "GCM");
+    }
+
+    @Override
+    public void onBackPressed() {
+        // go back to sign in screen
+        startActivity(LoginActivity.createIntent(mContext));
+        finish();
     }
 
     static final class SignedInConfig implements Parcelable {
