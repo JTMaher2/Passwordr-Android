@@ -129,4 +129,6 @@
     <string name="confirm_password">Confirm</string>
     <string name="generate">Generate</string>
     <string name="passwords">Passwords</string>
+    <string name="delete">Delete</string>
+    <string name="title_activity_confirm_delete_password">ConfirmDeletePasswordActivity</string>
 </resources>

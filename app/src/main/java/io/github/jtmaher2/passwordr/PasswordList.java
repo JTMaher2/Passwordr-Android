@@ -56,7 +56,8 @@ public class PasswordList extends AppCompatActivity {
     private static final int PASSWORD_TEXT_VIEW = 44;
     private static final int NOTE_TEXT_VIEW = 45;
     private static final int EDIT_BUTTON = 46;
-    private static final int PASSWORD_ID = 47;
+    private static final int DELETE_BUTTON = 47;
+    private static final int PASSWORD_ID = 48;
 
     FirebaseAuth mAuth;
     FirebaseFirestore mFirestore;
@@ -166,8 +167,8 @@ public class PasswordList extends AppCompatActivity {
             for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
                 View item = thisPassword.getChildAt(itemPos);
 
-                // if it's not the edit button itself
-                if (item.getId() != EDIT_BUTTON && item.getId() != PASSWORD_ID) {
+                // if it's not the edit button itself, the delete button, or the password ID
+                if (item.getId() != EDIT_BUTTON && item.getId() != DELETE_BUTTON && item.getId() != PASSWORD_ID) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
                         View layoutItemView = itemViewGroup.getChildAt(layoutItem);
@@ -198,6 +199,28 @@ public class PasswordList extends AppCompatActivity {
         }
     };
 
+    // takes user to ConfirmDelete activity
+    View.OnClickListener deletePasswordListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            String key = "";
+
+            // find the key for this password
+            final ViewGroup thisPassword = (ViewGroup)view.getParent();
+            for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
+                View item = thisPassword.getChildAt(itemPos);
+
+                if (item.getId() == PASSWORD_ID) {
+                    key = ((TextView)item).getText().toString();
+                }
+            }
+
+            // take user to confirm delete password activity
+            startActivity(ConfirmDeletePasswordActivity.createIntent(mContext, mMasterPassword, key));
+            finish();
+        }
+    };
+
     // applies changes to Firebase
     View.OnClickListener savePasswordListener = new View.OnClickListener() {
         @Override
@@ -211,7 +234,7 @@ public class PasswordList extends AppCompatActivity {
             for (int saveItemPos = 0; saveItemPos < thisPassword.getChildCount(); saveItemPos++) {
                 View item = thisPassword.getChildAt(saveItemPos);
 
-                if (item.getId() != EDIT_BUTTON && item.getId() != PASSWORD_ID) {
+                if (item.getId() != EDIT_BUTTON && item.getId() != DELETE_BUTTON && item.getId() != PASSWORD_ID) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
 
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
@@ -417,9 +440,17 @@ public class PasswordList extends AppCompatActivity {
                                 editButton.setOnClickListener(editPasswordListener);
                                 passwordCard.addView(editButton);
 
+                                // Delete button
+                                Button deleteButton = new Button(mContext);
+                                deleteButton.setText(R.string.delete);
+                                deleteButton.setId(DELETE_BUTTON);
+                                deleteButton.setOnClickListener(deletePasswordListener);
+                                passwordCard.addView(deleteButton);
+
                                 // Password ID
                                 TextView passwordID = new TextView(mContext);
                                 passwordID.setText(document.getId());
+                                passwordID.setVisibility(View.INVISIBLE);
                                 passwordID.setId(PASSWORD_ID);
                                 passwordCard.addView(passwordID);
 
