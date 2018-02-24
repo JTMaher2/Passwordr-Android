@@ -6,18 +6,19 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
-import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.AppCompatDelegate;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.firebase.ui.auth.AuthUI;
@@ -29,13 +30,14 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +49,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import static com.firebase.ui.auth.util.ExtraConstants.EXTRA_IDP_RESPONSE;
 
-public class PasswordList extends AppCompatActivity {
+public class PasswordList extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final String TAG = "PasswordList";
     private static final int IV_LEN = 12;
     private static final int MASTER_PASSWORD_LENGTH = 32;
@@ -55,9 +57,8 @@ public class PasswordList extends AppCompatActivity {
     private static final int URL_TEXT_VIEW = 43;
     private static final int PASSWORD_TEXT_VIEW = 44;
     private static final int NOTE_TEXT_VIEW = 45;
-    private static final int EDIT_BUTTON = 46;
-    private static final int DELETE_BUTTON = 47;
-    private static final int PASSWORD_ID = 48;
+    private static final int EDIT_AND_DELETE_BUTTONS = 46;
+    private static final int PASSWORD_ID = 47;
 
     FirebaseAuth mAuth;
     FirebaseFirestore mFirestore;
@@ -167,8 +168,8 @@ public class PasswordList extends AppCompatActivity {
             for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
                 View item = thisPassword.getChildAt(itemPos);
 
-                // if it's not the edit button itself, the delete button, or the password ID
-                if (item.getId() != EDIT_BUTTON && item.getId() != DELETE_BUTTON && item.getId() != PASSWORD_ID) {
+                // if it's not the edit and delete button layout, or the password ID
+                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
                         View layoutItemView = itemViewGroup.getChildAt(layoutItem);
@@ -188,8 +189,9 @@ public class PasswordList extends AppCompatActivity {
                             itemViewGroup.addView(editableItem);
                         }
                     }
-                } else if (item.getId() == EDIT_BUTTON){
-                    final Button itemButton = (Button)item;
+                } else if (item.getId() == EDIT_AND_DELETE_BUTTONS){
+                    LinearLayout editAndDeleteButtonLayout = (LinearLayout)item;
+                    final Button itemButton = (Button)(editAndDeleteButtonLayout.getChildAt(0)); // Edit button is first in layout
 
                     itemButton.setText(R.string.done);
 
@@ -234,7 +236,7 @@ public class PasswordList extends AppCompatActivity {
             for (int saveItemPos = 0; saveItemPos < thisPassword.getChildCount(); saveItemPos++) {
                 View item = thisPassword.getChildAt(saveItemPos);
 
-                if (item.getId() != EDIT_BUTTON && item.getId() != DELETE_BUTTON && item.getId() != PASSWORD_ID) {
+                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
 
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
@@ -334,10 +336,20 @@ public class PasswordList extends AppCompatActivity {
         toolbar.setNavigationOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 onBackPressed();
             }
         });
+
+        // sort options
+        final Spinner sortOptions = findViewById(R.id.sort_options);
+        // Create an ArrayAdapter using the sort options array and a default spinner layout
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.sort_options, android.R.layout.simple_spinner_item);
+        // Specify the layout to use when the list of choices appears
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Apply the adapter to the spinner
+        sortOptions.setAdapter(adapter);
+        sortOptions.setOnItemSelectedListener(this);
 
         FirebaseApp.initializeApp(this);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -433,19 +445,24 @@ public class PasswordList extends AppCompatActivity {
                                 noteLayout.addView(noteTextView);
                                 passwordCard.addView(noteLayout);
 
+                                // Edit & Delete button layout
+                                LinearLayout editAndDeleteButtons = new LinearLayout(mContext);
+                                editAndDeleteButtons.setId(EDIT_AND_DELETE_BUTTONS);
+                                editAndDeleteButtons.setOrientation(LinearLayout.HORIZONTAL);
+
                                 // Edit button
                                 Button editButton = new Button(mContext);
                                 editButton.setText(R.string.edit);
-                                editButton.setId(EDIT_BUTTON);
                                 editButton.setOnClickListener(editPasswordListener);
-                                passwordCard.addView(editButton);
+                                editAndDeleteButtons.addView(editButton);
 
                                 // Delete button
                                 Button deleteButton = new Button(mContext);
                                 deleteButton.setText(R.string.delete);
-                                deleteButton.setId(DELETE_BUTTON);
                                 deleteButton.setOnClickListener(deletePasswordListener);
-                                passwordCard.addView(deleteButton);
+                                editAndDeleteButtons.addView(deleteButton);
+
+                                passwordCard.addView(editAndDeleteButtons);
 
                                 // Password ID
                                 TextView passwordID = new TextView(mContext);
@@ -456,6 +473,8 @@ public class PasswordList extends AppCompatActivity {
 
                                 passwordsLayout.addView(passwordCard);
                             }
+
+                            onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                         } else {
                             Log.w(TAG, "Error getting documents.", task.getException());
                         }
@@ -476,6 +495,87 @@ public class PasswordList extends AppCompatActivity {
             finish();
         }
     }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+        final String sortType = parent.getItemAtPosition(pos).toString(); // either A-Z or Z-A
+        LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
+
+        if (passwordsLayout.getChildCount() > 0) {
+            LinearLayout sortedPasswordsLayout = new LinearLayout(mContext);
+            sortedPasswordsLayout.setOrientation(LinearLayout.VERTICAL);
+            sortedPasswordsLayout.setId(R.id.passwords_layout);
+            ArrayList<String> allPasswordNames = new ArrayList<>();
+
+            // get all password names
+            for (int passwordIndex = 0; passwordIndex < passwordsLayout.getChildCount(); passwordIndex++) {
+                LinearLayout passwordCard = (LinearLayout) passwordsLayout.getChildAt(passwordIndex);
+
+                for (int passwordElemIndex = 0; passwordElemIndex < passwordCard.getChildCount(); passwordElemIndex++) {
+                    View passwordCardElem = passwordCard.getChildAt(passwordElemIndex);
+
+                    if (passwordCardElem instanceof LinearLayout) {
+                        for (int passwordFieldIndex = 0; passwordFieldIndex < ((LinearLayout) passwordCardElem).getChildCount(); passwordFieldIndex++) {
+                            View passwordField = ((LinearLayout) passwordCardElem).getChildAt(passwordFieldIndex);
+
+                            // add name to list
+                            if (passwordField.getId() == NAME_TEXT_VIEW) {
+                                allPasswordNames.add(((TextView) passwordField).getText().toString());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // sort the list of names
+            Collections.sort(allPasswordNames, new Comparator<String>() {
+                @Override
+                public int compare(String name2, String name1) {
+                    if (sortType.equals("A-Z")) {
+                        return name2.toLowerCase().compareTo(name1.toLowerCase());
+                    } else { // Z-A
+                        return name1.toLowerCase().compareTo(name2.toLowerCase());
+                    }
+                }
+            });
+
+            // populate sortedPasswordsLayout with password cards based on new order
+            for (int passwordNameIndex = 0; passwordNameIndex < allPasswordNames.size(); passwordNameIndex++) {
+                for (int passwordIndex = 0; passwordIndex < passwordsLayout.getChildCount(); passwordIndex++) {
+                    LinearLayout passwordCard = (LinearLayout) passwordsLayout.getChildAt(passwordIndex);
+
+                    for (int passwordElemIndex = 0; passwordElemIndex < passwordCard.getChildCount(); passwordElemIndex++) {
+                        View passwordCardElem = passwordCard.getChildAt(passwordElemIndex);
+
+                        if (passwordCardElem instanceof LinearLayout) {
+                            for (int passwordFieldIndex = 0; passwordFieldIndex < ((LinearLayout) passwordCardElem).getChildCount(); passwordFieldIndex++) {
+                                View passwordField = ((LinearLayout) passwordCardElem).getChildAt(passwordFieldIndex);
+
+                                if (passwordField.getId() == NAME_TEXT_VIEW) {
+                                    TextView passwordNameTextView = (TextView) passwordField;
+
+                                    // if this password card corresponds to the current sorted name
+                                    if (passwordNameTextView.getText().toString().equals(allPasswordNames.get(passwordNameIndex))) {
+                                        passwordsLayout.removeView(passwordCard); // remove from old layout
+                                        sortedPasswordsLayout.addView(passwordCard); // add to sorted passwords layout
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // replace passwordsLayout with sortedPasswordsLayout
+            ViewGroup passwordsLayoutParent = (ViewGroup) passwordsLayout.getParent();
+            int index = passwordsLayoutParent.indexOfChild(passwordsLayout);
+            passwordsLayoutParent.removeView(passwordsLayout);
+            passwordsLayoutParent.addView(sortedPasswordsLayout, index);
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> adapterView) {    }
 
     // generates an AES key
     private SecretKeySpec generateKey(String password) throws Exception{
