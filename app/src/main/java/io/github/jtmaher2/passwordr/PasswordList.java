@@ -1,5 +1,6 @@
 package io.github.jtmaher2.passwordr;
 
+import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -8,9 +9,13 @@ import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -62,7 +67,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
     FirebaseAuth mAuth;
     FirebaseFirestore mFirestore;
-    private String mMasterPassword = "";
+    private static String mMasterPassword = "";
     private Context mContext;
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String EXTRA_SIGNED_IN_CONFIG = "extra_signed_in_config";
@@ -322,6 +327,78 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
     };
 
+    // restore list back to default state
+    private void clearSearchResults() {
+
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the options menu from XML
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_password_list, menu);
+
+        // Get the SearchView and set the searchable configuration
+        SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+        SearchView searchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
+        // Assumes current activity is the searchable activity
+        if (searchManager != null) {
+            searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
+        }
+        searchView.setIconifiedByDefault(false); // Do not iconify the widget; expand it by default
+
+        MenuItem clearSearch = menu.findItem(R.id.menu_clear_search);
+
+        clearSearch.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                clearSearchResults();
+                return false;
+            }
+        });
+
+        return true;
+    }
+
+    // filter the results based on search string
+    private void filterResults(String query) {
+        LinearLayout passwordsLayout = findViewById(R.id.passwords_layout),
+                filteredPasswordsLayout = new LinearLayout(this);
+        filteredPasswordsLayout.setOrientation(LinearLayout.VERTICAL);
+        filteredPasswordsLayout.setId(R.id.passwords_layout);
+
+        // get all password names
+        for (int passwordIndex = 0; passwordIndex < passwordsLayout.getChildCount(); passwordIndex++) {
+            LinearLayout passwordCard = (LinearLayout) passwordsLayout.getChildAt(passwordIndex);
+
+            for (int passwordElemIndex = 0; passwordElemIndex < passwordCard.getChildCount(); passwordElemIndex++) {
+                View passwordCardElem = passwordCard.getChildAt(passwordElemIndex);
+
+                if (passwordCardElem instanceof LinearLayout) {
+                    for (int passwordFieldIndex = 0; passwordFieldIndex < ((LinearLayout) passwordCardElem).getChildCount(); passwordFieldIndex++) {
+                        View passwordField = ((LinearLayout) passwordCardElem).getChildAt(passwordFieldIndex);
+
+                        // add password to new view if it contains search string
+                        if (passwordField.getId() == NAME_TEXT_VIEW) {
+                            TextView nameTextView = (TextView) passwordField;
+                            String name = nameTextView.getText().toString();
+                            if (name.toLowerCase().contains(query.toLowerCase())) {
+                                passwordsLayout.removeView(passwordCard);
+                                filteredPasswordsLayout.addView(passwordCard);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // replace passwordsLayout with filteredPasswordsLayout
+        ViewGroup passwordsLayoutParent = (ViewGroup) passwordsLayout.getParent();
+        int index = passwordsLayoutParent.indexOfChild(passwordsLayout);
+        passwordsLayoutParent.removeView(passwordsLayout);
+        passwordsLayoutParent.addView(filteredPasswordsLayout, index);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -357,7 +434,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         mAuth = FirebaseAuth.getInstance();
         mFirestore = FirebaseFirestore.getInstance();
         Bundle extras = getIntent().getExtras();
-        mMasterPassword = extras == null ? "" : extras.getString(EXTRA_MASTER_PASSWORD);
+        if (extras != null) {
+            String newMasterPassword = extras.getString(EXTRA_MASTER_PASSWORD);
+
+            if (newMasterPassword != null) {
+                mMasterPassword = newMasterPassword;
+            }
+        }
 
         // make sure master password is correct length
         StringBuilder sb = new StringBuilder();
@@ -474,13 +557,22 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 passwordsLayout.addView(passwordCard);
                             }
 
+                            // sort A-Z
                             onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
+
+                            // if user wants to filter the results, do this
+                            Intent intent = getIntent();
+                            if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+                                String query = intent.getStringExtra(SearchManager.QUERY);
+                                filterResults(query);
+                            }
                         } else {
                             Log.w(TAG, "Error getting documents.", task.getException());
                         }
                     }
                 });
 
+            // add new password
             FloatingActionButton newPasswordBtn = findViewById(R.id.new_password_btn);
             newPasswordBtn.setOnClickListener(new View.OnClickListener() {
                 @Override

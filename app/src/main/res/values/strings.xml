@@ -131,4 +131,7 @@
     <string name="passwords">Passwords</string>
     <string name="delete">Delete</string>
     <string name="title_activity_confirm_delete_password">ConfirmDeletePasswordActivity</string>
+    <string name="search">Search</string>
+    <string name="clear">Clear</string>
+
 </resources>
