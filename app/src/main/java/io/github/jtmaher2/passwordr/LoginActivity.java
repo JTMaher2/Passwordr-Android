@@ -206,6 +206,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                         this,
                         response,
                         mMasterPasswordInput.getText().toString(),
+                        null,
                         new PasswordList.SignedInConfig(
                                 AuthUI.NO_LOGO,
                                 AuthUI.getDefaultTheme(),

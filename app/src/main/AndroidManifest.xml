@@ -21,8 +21,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.SEARCH" />
             </intent-filter>
-            <meta-data android:name="android.app.searchable"
-                android:resource="@xml/searchable"/>
+
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
         </activity>
         <activity
             android:name=".LoginActivity"
@@ -51,6 +53,8 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="io.github.jtmaher2.passwordr.PasswordList" />
         </activity>
+        <activity android:name=".ChangeMasterPasswordActivity" />
+        <activity android:name=".ImportExportPasswordsActivity"></activity>
     </application>
 
 </manifest>

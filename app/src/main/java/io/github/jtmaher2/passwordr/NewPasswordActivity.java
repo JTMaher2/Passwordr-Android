@@ -172,7 +172,6 @@ public class NewPasswordActivity extends AppCompatActivity {
                     newPassword.put("password", encryptField(passwordEditText.getText().toString()));
                     newPassword.put("note", encryptField(noteEditText.getText().toString()));
 
-                    // overwrite existing password
                     mFirestore.collection("passwords").document()
                             .set(newPassword)
                             .addOnSuccessListener(new OnSuccessListener<Void>() {
@@ -181,7 +180,7 @@ public class NewPasswordActivity extends AppCompatActivity {
                                     Log.d(TAG, "DocumentSnapshot successfully written!");
 
                                     // go back to list
-                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null));
+                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
                                     finish();
                                 }
                             })
@@ -215,7 +214,7 @@ public class NewPasswordActivity extends AppCompatActivity {
     @Override
     public boolean onSupportNavigateUp() {
         // go back to list
-        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null));
+        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
         finish();
         return true;
     }

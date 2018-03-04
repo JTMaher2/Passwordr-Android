@@ -57,7 +57,7 @@ public class ConfirmDeletePasswordActivity extends AppCompatActivity {
                         .delete();
 
                 // go back to passwords list
-                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null));
+                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
                 finish();
             }
         });
@@ -66,7 +66,7 @@ public class ConfirmDeletePasswordActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 // go back to passwords list
-                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null));
+                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
                 finish();
             }
         });
