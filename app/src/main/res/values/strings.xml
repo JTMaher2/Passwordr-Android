@@ -135,5 +135,12 @@
     <string name="clear">Clear</string>
     <string name="change_master_password">Change master password</string>
     <string name="import_export">Import/Export</string>
+    <string name="delete_password">Delete password?</string>
+    <string name="cancel">Cancel</string>
+    <string name="go">Go</string>
+    <string name="xml">XML</string>
+    <string name="json">JSON</string>
+    <string name="import_str">Import</string>
+    <string name="export">Export</string>
 
 </resources>

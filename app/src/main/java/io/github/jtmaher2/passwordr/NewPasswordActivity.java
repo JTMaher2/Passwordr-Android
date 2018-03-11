@@ -180,7 +180,7 @@ public class NewPasswordActivity extends AppCompatActivity {
                                     Log.d(TAG, "DocumentSnapshot successfully written!");
 
                                     // go back to list
-                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
+                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                     finish();
                                 }
                             })
@@ -214,7 +214,7 @@ public class NewPasswordActivity extends AppCompatActivity {
     @Override
     public boolean onSupportNavigateUp() {
         // go back to list
-        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null));
+        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
         finish();
         return true;
     }

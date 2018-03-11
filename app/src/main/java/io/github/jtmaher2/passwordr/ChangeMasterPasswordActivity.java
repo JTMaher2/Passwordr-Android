@@ -44,7 +44,7 @@ public class ChangeMasterPasswordActivity extends AppCompatActivity {
 
                 if (newMasterPassword.equals(confirmNewMasterPassword)) { // pass master password
                     if (meetsCriteria(newMasterPassword)) {
-                        startActivity(PasswordList.createIntent(getApplicationContext(), null, oldMasterPassword, newMasterPassword, null));
+                        startActivity(PasswordList.createIntent(getApplicationContext(), null, oldMasterPassword, newMasterPassword, null, null, null));
                         finish();
                     } else {
                         Snackbar.make((View)saveButton.getParent(), "The master password must be at least 8 chars, with 1 number and 1 non-alphanumeric character.", Snackbar.LENGTH_LONG).show();
@@ -59,7 +59,7 @@ public class ChangeMasterPasswordActivity extends AppCompatActivity {
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) { // do not pass anything
-                startActivity(PasswordList.createIntent(getApplicationContext(), null, null, null,null));
+                startActivity(PasswordList.createIntent(getApplicationContext(), null, null, null,null, null, null));
                 finish();
             }
         });

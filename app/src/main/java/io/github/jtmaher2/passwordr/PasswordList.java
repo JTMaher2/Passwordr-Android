@@ -3,16 +3,21 @@ package io.github.jtmaher2.passwordr;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
+import android.util.Xml;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -26,6 +31,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
@@ -40,6 +46,17 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.xmlpull.v1.XmlSerializer;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,6 +70,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 import static com.firebase.ui.auth.util.ExtraConstants.EXTRA_IDP_RESPONSE;
 
 public class PasswordList extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
@@ -65,7 +83,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final int NOTE_TEXT_VIEW = 45;
     private static final int EDIT_AND_DELETE_BUTTONS = 46;
     private static final int PASSWORD_ID = 47;
-
+    private static final String TYPE_XML = "text/xml";
+    private static final String TYPE_JSON = "application/octet-stream";
+    private static final int REQUEST_WRITE_STORAGE = 112;
+    private ArrayList<Password> mSerializedPasswords;
     FirebaseAuth mAuth;
     FirebaseFirestore mFirestore;
     private static String mMasterPassword = "";
@@ -73,7 +94,11 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private String mChangedMasterPassword;
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String EXTRA_SIGNED_IN_CONFIG = "extra_signed_in_config";
+    private static final String EXTRA_IMPORTED_PASSWORDS = "extra_imported_passwords";
     private static final String EXTRA_CHANGED_MASTER_PASSWORD = "extra_changed_master_password";
+    private static final String EXTRA_EXPORT_TYPE = "extra_export_type";
+    private ArrayList<Password> mImportedPasswords;
+    private String mExportType;
 
     private boolean mFilter = false; // initially, do not display "Clear" option
 
@@ -82,20 +107,18 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             IdpResponse idpResponse,
             String masterPassword,
             String changedMasterPassword,
-            SignedInConfig signedInConfig) {
+            SignedInConfig signedInConfig,
+            ArrayList<Password> importedPasswords,
+            String exportType) {
         Intent startIntent = new Intent();
-        if (idpResponse != null) {
-            startIntent.putExtra(EXTRA_IDP_RESPONSE, idpResponse);
-        }
-        if (masterPassword != null) {
-            startIntent.putExtra(EXTRA_MASTER_PASSWORD, masterPassword);
-        }
-        if (changedMasterPassword != null) {
-            startIntent.putExtra(EXTRA_CHANGED_MASTER_PASSWORD, changedMasterPassword);
-        }
 
         return startIntent.setClass(context, PasswordList.class)
-                .putExtra(EXTRA_SIGNED_IN_CONFIG, signedInConfig);
+                .putExtra(EXTRA_IDP_RESPONSE, idpResponse)
+                .putExtra(EXTRA_MASTER_PASSWORD, masterPassword)
+                .putExtra(EXTRA_CHANGED_MASTER_PASSWORD, changedMasterPassword)
+                .putExtra(EXTRA_SIGNED_IN_CONFIG, signedInConfig)
+                .putParcelableArrayListExtra(EXTRA_IMPORTED_PASSWORDS, importedPasswords)
+                .putExtra(EXTRA_EXPORT_TYPE, exportType);
     }
 
     // encrypt a field
@@ -336,19 +359,112 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
     };
 
+    // convert password list to JSON file, and save to disk
+    private void writeJSONFile() {
+        JSONObject passwordsJSON = new JSONObject();
+        try {
+            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOWNLOADS), "passwords.json"));
+
+            for (int p = 0; p < mSerializedPasswords.size(); p++) {
+                JSONObject passwordJSON = new JSONObject();
+
+                passwordJSON.put("name", mSerializedPasswords.get(p).name);
+                passwordJSON.put("url", mSerializedPasswords.get(p).url);
+                passwordJSON.put("password_str", mSerializedPasswords.get(p).password);
+                passwordJSON.put("note", mSerializedPasswords.get(p).note);
+
+                passwordsJSON.put("password-" + p, passwordJSON);
+            }
+            // get rid of the backslashes that the .put method automatically prepends to forward slashes
+            fileos.write(new JSONObject().put("passwords", passwordsJSON).toString().replace("\\/", "/").getBytes());
+            fileos.close();
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode)
+        {
+            case REQUEST_WRITE_STORAGE: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                {
+                    switch (mExportType) {
+                        case TYPE_XML:
+                            writeXMLFile();
+                            break;
+                        case TYPE_JSON:
+                            writeJSONFile();
+                            break;
+                    }
+                } else
+                {
+                    Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+
+    }
+
+    // convert password list to XML file, and save to disk
+    private void writeXMLFile() {
+        try {
+            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOWNLOADS), "passwords.xml"));
+            XmlSerializer xmlSerializer = Xml.newSerializer();
+            StringWriter writer = new StringWriter();
+            xmlSerializer.setOutput(writer);
+
+            // generate document
+            xmlSerializer.startDocument("UTF-8", true);
+            xmlSerializer.startTag(null, "passwords");
+
+            for (Password p : mSerializedPasswords) {
+                xmlSerializer.startTag(null, "password");
+                xmlSerializer.startTag(null, "name");
+                xmlSerializer.text(p.name);
+                xmlSerializer.endTag(null, "name");
+                xmlSerializer.startTag(null, "url");
+                xmlSerializer.text(p.url);
+                xmlSerializer.endTag(null, "url");
+                xmlSerializer.startTag(null, "password_str");
+                xmlSerializer.text(p.password);
+                xmlSerializer.endTag(null, "password_str");
+                xmlSerializer.startTag(null, "note");
+                xmlSerializer.text(p.note);
+                xmlSerializer.endTag(null, "note");
+                xmlSerializer.endTag(null, "password");
+            }
+
+            xmlSerializer.endTag(null, "passwords");
+            xmlSerializer.endDocument();
+            xmlSerializer.flush();
+
+            String dataWrite = writer.toString();
+            fileos.write(dataWrite.getBytes());
+            fileos.close();
+        }
+        catch (IllegalArgumentException | IllegalStateException | IOException e) {
+            Log.e(TAG, Arrays.toString(e.getStackTrace()));
+        }
+    }
+
     // download passwords from Firestore
     private void populateList(FirebaseFirestore db, FirebaseUser curUser) {
-        final LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
-        final ViewGroup passwordsLayoutParent = (ViewGroup) passwordsLayout.getParent();
+        final LinearLayout[] passwordsLayout = {findViewById(R.id.passwords_layout)};
+        final ViewGroup passwordsLayoutParent = (ViewGroup) passwordsLayout[0].getParent();
         final LinearLayout newPasswordsLayout = new LinearLayout(mContext);
         newPasswordsLayout.setOrientation(LinearLayout.VERTICAL);
         boolean initial = false;
-        if (passwordsLayout.getChildCount() == 0) {
+        if (passwordsLayout[0].getChildCount() == 0) {
             initial = true;
         }
 
-        final ProgressBar encryptingPasswordsProgressBar = findViewById(R.id.encryptingPasswordsProgressBar);
-        encryptingPasswordsProgressBar.setVisibility(View.GONE);
+        final ProgressBar encryptingOrDeletingPasswordsProgressBar = findViewById(R.id.encryptingOrDeletingPasswordsProgressBar);
+        encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
 
         // sort options
         final Spinner sortOptions = findViewById(R.id.sort_options);
@@ -363,170 +479,242 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
         final boolean finalInitial = initial;
 
-        // display all passwords using mMasterPassword as decryption key
         db.collection("passwords")
-                    .whereEqualTo("userid", curUser.getUid())
-                    .get()
-                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                            if (task.isSuccessful()) {
-                                for (DocumentSnapshot document : task.getResult()) {
-                                    LinearLayout passwordCard = new LinearLayout(mContext);
-                                    passwordCard.setOrientation(LinearLayout.VERTICAL);
+                .whereEqualTo("userid", curUser.getUid())
+                .get()
+                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                        if (task.isSuccessful()) {
+                            for (DocumentSnapshot document : task.getResult()) {
+                                LinearLayout passwordCard = new LinearLayout(mContext);
+                                passwordCard.setOrientation(LinearLayout.VERTICAL);
 
-                                    // name
-                                    LinearLayout nameLayout = new LinearLayout(mContext);
-                                    nameLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                    TextView nameLabelTextView = new TextView(mContext);
-                                    nameLabelTextView.setText(R.string.name_label);
-                                    nameLayout.addView(nameLabelTextView);
-                                    TextView nameTextView = new TextView(mContext);
-                                    nameTextView.setText(decryptField(document.getString("name")));
-                                    nameTextView.setId(NAME_TEXT_VIEW);
-                                    nameLayout.addView(nameTextView);
-                                    passwordCard.addView(nameLayout);
+                                // name
+                                LinearLayout nameLayout = new LinearLayout(mContext);
+                                nameLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView nameLabelTextView = new TextView(mContext);
+                                nameLabelTextView.setText(R.string.name_label);
+                                nameLayout.addView(nameLabelTextView);
+                                TextView nameTextView = new TextView(mContext);
+                                nameTextView.setText(decryptField(document.getString("name")));
+                                nameTextView.setId(NAME_TEXT_VIEW);
+                                nameLayout.addView(nameTextView);
+                                passwordCard.addView(nameLayout);
 
-                                    // url
-                                    LinearLayout urlLayout = new LinearLayout(mContext);
-                                    urlLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                    TextView urlLabelTextView = new TextView(mContext);
-                                    urlLabelTextView.setText(R.string.url_label);
-                                    urlLayout.addView(urlLabelTextView);
-                                    TextView urlTextView = new TextView(mContext);
-                                    urlTextView.setText(decryptField(document.getString("url")));
-                                    urlTextView.setId(URL_TEXT_VIEW);
-                                    Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
-                                    urlLayout.addView(urlTextView);
-                                    passwordCard.addView(urlLayout);
+                                // url
+                                LinearLayout urlLayout = new LinearLayout(mContext);
+                                urlLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView urlLabelTextView = new TextView(mContext);
+                                urlLabelTextView.setText(R.string.url_label);
+                                urlLayout.addView(urlLabelTextView);
+                                TextView urlTextView = new TextView(mContext);
+                                urlTextView.setText(decryptField(document.getString("url")));
+                                urlTextView.setId(URL_TEXT_VIEW);
+                                Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
+                                urlLayout.addView(urlTextView);
+                                passwordCard.addView(urlLayout);
 
-                                    // password
-                                    LinearLayout passwordLayout = new LinearLayout(mContext);
-                                    passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                    TextView passwordLabelTextView = new TextView(mContext);
-                                    passwordLabelTextView.setText(R.string.password_label);
-                                    passwordLayout.addView(passwordLabelTextView);
-                                    TextView passwordTextView = new TextView(mContext);
-                                    passwordTextView.setText(decryptField(document.getString("password")));
-                                    passwordTextView.setId(PASSWORD_TEXT_VIEW);
-                                    passwordTextView.setVisibility(View.INVISIBLE);
-                                    passwordTextView.setTextIsSelectable(true);
-                                    passwordLayout.addView(passwordTextView);
-                                    Button showPasswordButton = new Button(mContext);
-                                    showPasswordButton.setText(R.string.show);
-                                    showPasswordButton.setOnClickListener(showPasswordListener);
-                                    passwordLayout.addView(showPasswordButton);
-                                    passwordCard.addView(passwordLayout);
+                                // password
+                                LinearLayout passwordLayout = new LinearLayout(mContext);
+                                passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView passwordLabelTextView = new TextView(mContext);
+                                passwordLabelTextView.setText(R.string.password_label);
+                                passwordLayout.addView(passwordLabelTextView);
+                                TextView passwordTextView = new TextView(mContext);
+                                passwordTextView.setText(decryptField(document.getString("password")));
+                                passwordTextView.setId(PASSWORD_TEXT_VIEW);
+                                passwordTextView.setVisibility(View.INVISIBLE);
+                                passwordTextView.setTextIsSelectable(true);
+                                passwordLayout.addView(passwordTextView);
+                                Button showPasswordButton = new Button(mContext);
+                                showPasswordButton.setText(R.string.show);
+                                showPasswordButton.setOnClickListener(showPasswordListener);
+                                passwordLayout.addView(showPasswordButton);
+                                passwordCard.addView(passwordLayout);
 
-                                    // note
-                                    LinearLayout noteLayout = new LinearLayout(mContext);
-                                    noteLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                    TextView noteLabelTextView = new TextView(mContext);
-                                    noteLabelTextView.setText(R.string.note);
-                                    noteLayout.addView(noteLabelTextView);
-                                    TextView noteTextView = new TextView(mContext);
-                                    String decryptedNote = decryptField(document.getString("note"));
-                                    // if it's not empty, add a newline
-                                    if (decryptedNote != null && !decryptedNote.equals(" "))
-                                        decryptedNote += "\n";
-                                    noteTextView.setText(decryptedNote);
-                                    noteTextView.setId(NOTE_TEXT_VIEW);
-                                    noteLayout.addView(noteTextView);
-                                    passwordCard.addView(noteLayout);
+                                // note
+                                LinearLayout noteLayout = new LinearLayout(mContext);
+                                noteLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView noteLabelTextView = new TextView(mContext);
+                                noteLabelTextView.setText(R.string.note);
+                                noteLayout.addView(noteLabelTextView);
+                                TextView noteTextView = new TextView(mContext);
+                                String decryptedNote = decryptField(document.getString("note"));
+                                // if it's not empty, add a newline
+                                if (decryptedNote != null && !decryptedNote.equals(" "))
+                                    decryptedNote += "\n";
+                                noteTextView.setText(decryptedNote);
+                                noteTextView.setId(NOTE_TEXT_VIEW);
+                                noteLayout.addView(noteTextView);
+                                passwordCard.addView(noteLayout);
 
-                                    // Edit & Delete button layout
-                                    LinearLayout editAndDeleteButtons = new LinearLayout(mContext);
-                                    editAndDeleteButtons.setId(EDIT_AND_DELETE_BUTTONS);
-                                    editAndDeleteButtons.setOrientation(LinearLayout.HORIZONTAL);
+                                // Edit & Delete button layout
+                                LinearLayout editAndDeleteButtons = new LinearLayout(mContext);
+                                editAndDeleteButtons.setId(EDIT_AND_DELETE_BUTTONS);
+                                editAndDeleteButtons.setOrientation(LinearLayout.HORIZONTAL);
 
-                                    // Edit button
-                                    Button editButton = new Button(mContext);
-                                    editButton.setText(R.string.edit);
-                                    editButton.setOnClickListener(editPasswordListener);
-                                    editAndDeleteButtons.addView(editButton);
+                                // Edit button
+                                Button editButton = new Button(mContext);
+                                editButton.setText(R.string.edit);
+                                editButton.setOnClickListener(editPasswordListener);
+                                editAndDeleteButtons.addView(editButton);
 
-                                    // Delete button
-                                    Button deleteButton = new Button(mContext);
-                                    deleteButton.setText(R.string.delete);
-                                    deleteButton.setOnClickListener(deletePasswordListener);
-                                    editAndDeleteButtons.addView(deleteButton);
+                                // Delete button
+                                Button deleteButton = new Button(mContext);
+                                deleteButton.setText(R.string.delete);
+                                deleteButton.setOnClickListener(deletePasswordListener);
+                                editAndDeleteButtons.addView(deleteButton);
 
-                                    passwordCard.addView(editAndDeleteButtons);
+                                passwordCard.addView(editAndDeleteButtons);
 
-                                    // Password ID
-                                    TextView passwordID = new TextView(mContext);
-                                    passwordID.setText(document.getId());
-                                    passwordID.setVisibility(View.INVISIBLE);
-                                    passwordID.setId(PASSWORD_ID);
-                                    passwordCard.addView(passwordID);
+                                // Password ID
+                                TextView passwordID = new TextView(mContext);
+                                passwordID.setText(document.getId());
+                                passwordID.setVisibility(View.INVISIBLE);
+                                passwordID.setId(PASSWORD_ID);
+                                passwordCard.addView(passwordID);
 
-                                    if (finalInitial) {
-                                        passwordsLayout.addView(passwordCard);
-                                    } else {
-                                        newPasswordsLayout.addView(passwordCard);
-                                    }
-                                }
-
-                                // if it's initial update, accept search input
                                 if (finalInitial) {
-                                    // if user wants to change the master password
-                                    if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
-                                        mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
+                                    passwordsLayout[0].addView(passwordCard);
+                                } else {
+                                    newPasswordsLayout.addView(passwordCard);
+                                }
+                            }
 
-                                        final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
-                                        encryptingPasswordsProgressBar.setVisibility(View.VISIBLE);
+                            // if it's initial update
+                            if (finalInitial) {
+                                // if user wants to change the master password
+                                if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
+                                    mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
 
-                                        // re-encrypt everything using new master password
-                                        for (int password = 0; password < passwordsLayout.getChildCount(); password++) {
+                                    final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
+                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.VISIBLE);
+
+                                    // re-encrypt everything using new master password
+                                    for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
+                                        // get card
+                                        LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
+
+                                        String key = "";
+                                        Map<String, Object> newFields = new HashMap<>();
+                                        newFields.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+
+                                        // get key, name, url, password, and note
+                                        for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
+                                            View elemView = passwordCard.getChildAt(elem);
+
+                                            // encrypt using new master password
+                                            if (elemView instanceof LinearLayout) {
+                                                for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
+                                                    View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
+
+                                                    switch (elemViewElemView.getId()) {
+                                                        case NAME_TEXT_VIEW:
+                                                            newFields.put("name", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                            break;
+                                                        case URL_TEXT_VIEW:
+                                                            newFields.put("url", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                            break;
+                                                        case PASSWORD_TEXT_VIEW:
+                                                            newFields.put("password", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                            break;
+                                                        case NOTE_TEXT_VIEW:
+                                                            newFields.put("note", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                            break;
+                                                    }
+                                                }
+                                            } else if (elemView.getId() == PASSWORD_ID) {
+                                                key = ((TextView) elemView).getText().toString();
+                                            }
+                                        }
+
+                                        // upload to firebase
+                                        mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
+                                            @Override
+                                            public void onSuccess(Void aVoid) {
+                                                numEncrypted[0]++;
+                                                if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
+                                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
+                                                    // sort A-Z
+                                                    onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
+                                                }
+                                                Log.d(TAG, "DocumentSnapshot successfully written!");
+                                            }
+                                        }).addOnFailureListener(new OnFailureListener() {
+                                            @Override
+                                            public void onFailure(@NonNull Exception e) {
+                                                Log.w(TAG, "Error writing document", e);
+                                            }
+                                        });
+                                    }
+                                } else if (mImportedPasswords != null && mImportedPasswords.size() > 0) {
+                                    // if there are imported passwords,
+                                    // delete all of this user's passwords from Firebase
+                                    final int[] numAddedOrDeleted = {0}; // the number of passwords that have been added or deleted
+                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.VISIBLE);
+                                    final int numPasswords = passwordsLayout[0].getChildCount();
+                                    if (numPasswords > 0) {
+                                        for (int password = 0; password < numPasswords; password++) {
                                             // get card
-                                            LinearLayout passwordCard = (LinearLayout) passwordsLayout.getChildAt(password);
+                                            LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
 
                                             String key = "";
-                                            Map<String, Object> newFields = new HashMap<>();
-                                            newFields.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
 
-                                            // get key, name, url, password, and note
+                                            // get key of each password
                                             for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
                                                 View elemView = passwordCard.getChildAt(elem);
 
-                                                // encrypt using new master password
-                                                if (elemView instanceof LinearLayout) {
-                                                    for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
-                                                        View elemViewElemView = ((LinearLayout)elemView).getChildAt(elemViewElem);
-
-                                                        switch (elemViewElemView.getId()) {
-                                                            case NAME_TEXT_VIEW:
-                                                                newFields.put("name", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                                break;
-                                                            case URL_TEXT_VIEW:
-                                                                newFields.put("url", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                                break;
-                                                            case PASSWORD_TEXT_VIEW:
-                                                                newFields.put("password", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                                break;
-                                                            case NOTE_TEXT_VIEW:
-                                                                newFields.put("note", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                                break;
-                                                        }
-                                                    }
-                                                } else if (elemView.getId() == PASSWORD_ID) {
+                                                if (elemView.getId() == PASSWORD_ID) {
                                                     key = ((TextView) elemView).getText().toString();
+                                                    break;
                                                 }
                                             }
 
-                                            // upload to firebase
-                                            mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                @Override
-                                                public void onSuccess(Void aVoid) {
-                                                    numEncrypted[0]++;
-                                                    if (numEncrypted[0] == passwordsLayout.getChildCount()) {
-                                                        encryptingPasswordsProgressBar.setVisibility(View.GONE);
-                                                        // sort A-Z
-                                                        onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
-                                                    }
-                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                }
-                                            }).addOnFailureListener(new OnFailureListener() {
+                                            // delete
+                                            mFirestore.collection("passwords").document(key).delete()
+                                                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                        @Override
+                                                        public void onSuccess(Void aVoid) {
+                                                            numAddedOrDeleted[0]++;
+                                                            if (numAddedOrDeleted[0] == numPasswords) {
+                                                                numAddedOrDeleted[0] = 0; // reset
+
+                                                                // upload imported passwords
+                                                                for (Password importedPassword : mImportedPasswords) {
+                                                                    Map<String, Object> newPassword = new HashMap<>();
+                                                                    newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                                                    newPassword.put("name", encryptField(importedPassword.name));
+                                                                    newPassword.put("url", encryptField(importedPassword.url));
+                                                                    newPassword.put("password", encryptField(importedPassword.password));
+                                                                    newPassword.put("note", encryptField(importedPassword.note));
+
+                                                                    mFirestore.collection("passwords").document()
+                                                                            .set(newPassword)
+                                                                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                                                @Override
+                                                                                public void onSuccess(Void aVoid) {
+                                                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                                                    numAddedOrDeleted[0]++;
+                                                                                    if (numAddedOrDeleted[0] == mImportedPasswords.size()) {
+                                                                                        encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
+                                                                                        // refresh list
+                                                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                                                        finish();
+                                                                                    }
+                                                                                }
+                                                                            })
+                                                                            .addOnFailureListener(new OnFailureListener() {
+                                                                                @Override
+                                                                                public void onFailure(@NonNull Exception e) {
+                                                                                    Log.w(TAG, "Error writing document", e);
+                                                                                }
+                                                                            });
+                                                                }
+                                                            }
+                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                        }
+                                                    }).addOnFailureListener(new OnFailureListener() {
                                                 @Override
                                                 public void onFailure(@NonNull Exception e) {
                                                     Log.w(TAG, "Error writing document", e);
@@ -534,35 +722,128 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                             });
                                         }
                                     } else {
-                                        // sort A-Z
-                                        onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
-                                    }
+                                        // the password list was empty, so there is nothing to delete
+                                        // upload imported passwords
+                                        for (Password importedPassword : mImportedPasswords) {
+                                            Map<String, Object> newPassword = new HashMap<>();
+                                            newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                            newPassword.put("name", encryptField(importedPassword.name));
+                                            newPassword.put("url", encryptField(importedPassword.url));
+                                            newPassword.put("password", encryptField(importedPassword.password));
+                                            newPassword.put("note", encryptField(importedPassword.note));
 
-                                    // listen to search input
-                                    Intent intent = getIntent();
-                                    if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-                                        String query = intent.getStringExtra(SearchManager.QUERY);
-                                        filterResults(query);
-                                    }
-                                } else { // it's not initial update
-                                    // replace passwordsLayout with filteredPasswordsLayout
-                                    for (int i = 0; i < passwordsLayoutParent.getChildCount(); i++) {
-                                        if (passwordsLayoutParent.getChildAt(i).getId() == passwordsLayout.getId()) {
-                                            passwordsLayoutParent.removeViewAt(i);
-                                            break;
+                                            mFirestore.collection("passwords").document()
+                                                    .set(newPassword)
+                                                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                        @Override
+                                                        public void onSuccess(Void aVoid) {
+                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                            numAddedOrDeleted[0]++;
+                                                            if (numAddedOrDeleted[0] == mImportedPasswords.size()) {
+                                                                // refresh list
+                                                                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                                finish();
+                                                            }
+                                                        }
+                                                    })
+                                                    .addOnFailureListener(new OnFailureListener() {
+                                                        @Override
+                                                        public void onFailure(@NonNull Exception e) {
+                                                            Log.w(TAG, "Error writing document", e);
+                                                        }
+                                                    });
                                         }
                                     }
-                                    newPasswordsLayout.setId(passwordsLayout.getId()); // assign password layout ID to new password layout
-                                    passwordsLayoutParent.addView(newPasswordsLayout);
-
+                                } else {
                                     // sort A-Z
                                     onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
+                                    passwordsLayout[0] = findViewById(R.id.passwords_layout);
+                                    if (mExportType != null) {
+                                        // if external storage is writable
+                                        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
+                                        {
+                                            // put all password fields in list
+                                            mSerializedPasswords = new ArrayList<>();
+                                            for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
+                                                // get card
+                                                LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
+                                                String name = "", url = "", passwordStr = "", note = "", key = "";
+
+                                                // get key, name, url, password, and note of each password
+                                                for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
+                                                    View elemView = passwordCard.getChildAt(elem);
+
+                                                    if (elemView instanceof LinearLayout) {
+                                                        for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
+                                                            View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
+
+                                                            switch (elemViewElemView.getId()) {
+                                                                case NAME_TEXT_VIEW:
+                                                                    name = ((TextView) elemViewElemView).getText().toString();
+                                                                    break;
+                                                                case URL_TEXT_VIEW:
+                                                                    url = ((TextView) elemViewElemView).getText().toString();
+                                                                    break;
+                                                                case PASSWORD_TEXT_VIEW:
+                                                                    passwordStr = ((TextView) elemViewElemView).getText().toString();
+                                                                    break;
+                                                                case NOTE_TEXT_VIEW:
+                                                                    note = ((TextView) elemViewElemView).getText().toString();
+                                                                    break;
+                                                            }
+                                                        }
+                                                    } else if (elemView.getId() == PASSWORD_ID) {
+                                                        key = ((TextView) elemView).getText().toString();
+                                                    }
+                                                }
+
+                                                mSerializedPasswords.add(new Password(name, url, passwordStr, note));
+                                            }
+
+                                            // check if user has granted WRITE_EXTERNAL_STORAGE permission
+                                            boolean hasPermission = (ContextCompat.checkSelfPermission(mContext,
+                                                    WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+                                            if (hasPermission) {
+                                                switch (mExportType) {
+                                                    case TYPE_XML:
+                                                        writeXMLFile();
+                                                        break;
+                                                    case TYPE_JSON:
+                                                        writeJSONFile();
+                                                        break;
+                                                }
+                                            } else {
+                                                requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_STORAGE);
+                                            }
+                                        }
+                                    }
                                 }
-                            } else {
-                                Log.w(TAG, "Error getting documents.", task.getException());
+
+                                // listen to search input
+                                Intent intent = getIntent();
+                                if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+                                    String query = intent.getStringExtra(SearchManager.QUERY);
+                                    filterResults(query);
+                                }
+                            } else { // it's not initial update
+                                // replace passwordsLayout with filteredPasswordsLayout
+                                for (int i = 0; i < passwordsLayoutParent.getChildCount(); i++) {
+                                    if (passwordsLayoutParent.getChildAt(i).getId() == passwordsLayout[0].getId()) {
+                                        passwordsLayoutParent.removeViewAt(i);
+                                        break;
+                                    }
+                                }
+                                newPasswordsLayout.setId(passwordsLayout[0].getId()); // assign password layout ID to new password layout
+                                passwordsLayoutParent.addView(newPasswordsLayout);
+
+                                // sort A-Z
+                                onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                             }
+                        } else {
+                            Log.w(TAG, "Error getting documents.", task.getException());
                         }
-                    });
+                    }
+                });
     }
 
     @Override
@@ -613,7 +894,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
                 // take user to change master password activity
-                startActivity(ImportExportPasswordsActivity.createIntent(mContext));
+                startActivity(ImportExportPasswordsActivity.createIntent(mContext, mMasterPassword));
                 finish();
                 return false;
             }
@@ -721,6 +1002,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             if (changedMasterPassword != null) {
                 mChangedMasterPassword = make32CharsLong(changedMasterPassword);
             }
+
+            mImportedPasswords = extras.getParcelableArrayList(EXTRA_IMPORTED_PASSWORDS);
+
+            mExportType = extras.getString(EXTRA_EXPORT_TYPE);
         }
 
         FirebaseUser curUser = mAuth.getCurrentUser();

@@ -213,7 +213,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                                 googleProvider,
                                 FIREBASE_TOS_URL,
                                 false,
-                                false)));
+                                false),
+                        null,
+                        null));
     }
 
     /**
