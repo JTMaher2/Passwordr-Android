@@ -792,8 +792,6 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                                     break;
                                                             }
                                                         }
-                                                    } else if (elemView.getId() == PASSWORD_ID) {
-                                                        key = ((TextView) elemView).getText().toString();
                                                     }
                                                 }
 

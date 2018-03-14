@@ -3,46 +3,37 @@ package io.github.jtmaher2.passwordr;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Debug;
-import android.support.annotation.MainThread;
-import android.support.annotation.NonNull;
-import android.support.design.widget.Snackbar;
-import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
-
+import android.content.Context;
 import android.content.CursorLoader;
+import android.content.Intent;
 import android.content.Loader;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
-
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
-import android.text.TextUtils;
+import android.support.annotation.MainThread;
+import android.support.annotation.NonNull;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 
 import com.firebase.ui.auth.AuthUI;
-import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
+import com.twitter.sdk.android.core.DefaultLogger;
+import com.twitter.sdk.android.core.Twitter;
+import com.twitter.sdk.android.core.TwitterAuthConfig;
+import com.twitter.sdk.android.core.TwitterConfig;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import butterknife.BindView;
-import butterknife.OnClick;
 
 import static android.Manifest.permission.READ_CONTACTS;
 
@@ -77,6 +68,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private View mLoginFormView;
     private EditText mMasterPasswordInput;
 
+    private ArrayList<AuthUI.IdpConfig> mSignInProviders;
+
     public static Intent createIntent(Context context) {
         return new Intent(context, LoginActivity.class);
     }
@@ -86,7 +79,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
         //populateAutoComplete();
-
+        TwitterAuthConfig authConfig = new TwitterAuthConfig(getResources().getString(R.string.twitter_consumer_key), getResources().getString(R.string.twitter_consumer_secret));
+        TwitterConfig config = new TwitterConfig.Builder(this)
+                .logger(new DefaultLogger(Log.DEBUG))
+                .twitterAuthConfig(authConfig)
+                .debug(true)
+                .build();
+        Twitter.initialize(config);
         /*mPasswordView = findViewById(R.id.password);
         mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
@@ -98,11 +97,15 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 return false;
             }
         });*/
+        mSignInProviders = new ArrayList<>();
+        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build());
+        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build());
+        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build());
 
-        Button mGoogleSignInButton = findViewById(R.id.google_sign_in_button);
+        Button mGoogleSignInButton = findViewById(R.id.submit_master_password_btn);
         mGoogleSignInButton.setOnClickListener(new OnClickListener() {
             public void onClick(View view) {
-                attemptGoogleLogin();
+                attemptFirebaseLogin();
             }
         });
 
@@ -198,9 +201,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
 
     private void startSignedInActivity(IdpResponse response) {
-        ArrayList<AuthUI.IdpConfig> googleProvider = new ArrayList<>();
-        googleProvider.add(new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build());
-
         startActivity(
                 PasswordList.createIntent(
                         this,
@@ -210,7 +210,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                         new PasswordList.SignedInConfig(
                                 AuthUI.NO_LOGO,
                                 AuthUI.getDefaultTheme(),
-                                googleProvider,
+                                mSignInProviders,
                                 FIREBASE_TOS_URL,
                                 false,
                                 false),
@@ -219,9 +219,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
 
     /**
-     * Attempts to sign in or register the account specified by the Google sign in provider.
+     * Attempts to sign in or register the account specified by the Google, Twiiter, or Facebook sign in providers.
      */
-    private void attemptGoogleLogin() {
+    private void attemptFirebaseLogin() {
         if (mAuthTask != null) {
             return;
         }
@@ -237,13 +237,11 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
             showProgress(true);
-            ArrayList<AuthUI.IdpConfig> googleProvider = new ArrayList<>();
-            googleProvider.add(new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build());
             startActivityForResult(
                     AuthUI.getInstance().createSignInIntentBuilder()
                             .setTheme(AuthUI.getDefaultTheme())
                             .setLogo(AuthUI.NO_LOGO)
-                            .setAvailableProviders(googleProvider)
+                            .setAvailableProviders(mSignInProviders)
                             .setTosUrl(FIREBASE_TOS_URL)
                             .setPrivacyPolicyUrl(FIREBASE_PRIVACY_POLICY_URL)
                             .setIsSmartLockEnabled(false)

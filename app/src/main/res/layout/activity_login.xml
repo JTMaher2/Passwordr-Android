@@ -19,6 +19,14 @@
         android:layout_marginBottom="8dp"
         android:visibility="gone" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enter Master Password"
+        android:textAlignment="center"
+        android:textColor="@android:color/black"
+        android:textSize="30sp" />
+
     <EditText
         android:id="@+id/master_password_input"
         android:layout_width="match_parent"
@@ -27,39 +35,12 @@
         android:inputType="textPassword" />
 
     <Button
-        android:id="@+id/google_sign_in_button"
+        android:id="@+id/submit_master_password_btn"
         style="?android:textAppearanceSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="@string/google_sign_in"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/facebook_sign_in_button"
-        style="?android:textAppearanceSmall"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/facebook_sign_in"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/twitter_sign_in_button"
-        style="?android:textAppearanceSmall"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/twitter_sign_in"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/github_sign_in_button"
-        style="?android:textAppearanceSmall"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/github_sign_in"
+        android:text="Submit"
         android:textStyle="bold" />
 
 </LinearLayout>

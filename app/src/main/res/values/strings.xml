@@ -2,6 +2,10 @@
     <string name="app_name">Passwordr</string>
 
     <!-- Strings related to login -->
+    <string name="facebook_app_id">160672534565859</string>
+    <string name="fb_login_protocol_scheme">fb160672534565859</string>
+    <string name="twitter_consumer_key">qOo4ciqORozZ1SzsdZjVaUWXh</string>
+    <string name="twitter_consumer_secret">UpXx4wZvggAEcG1lUF09lndCdWKNBzcDAnzVCMl2RV2pVMfX9I</string>
     <string name="prompt_email">Email</string>
     <string name="prompt_password">Password (optional)</string>
     <string name="action_sign_in">Sign in or register</string>
