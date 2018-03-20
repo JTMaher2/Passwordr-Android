@@ -79,13 +79,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
         //populateAutoComplete();
-        TwitterAuthConfig authConfig = new TwitterAuthConfig(getResources().getString(R.string.twitter_consumer_key), getResources().getString(R.string.twitter_consumer_secret));
+        /*TwitterAuthConfig authConfig = new TwitterAuthConfig(getResources().getString(R.string.twitter_consumer_key), getResources().getString(R.string.twitter_consumer_secret));
         TwitterConfig config = new TwitterConfig.Builder(this)
                 .logger(new DefaultLogger(Log.DEBUG))
                 .twitterAuthConfig(authConfig)
                 .debug(true)
                 .build();
-        Twitter.initialize(config);
+        Twitter.initialize(config);*/
         /*mPasswordView = findViewById(R.id.password);
         mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
@@ -102,8 +102,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build());
         mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build());
 
-        Button mGoogleSignInButton = findViewById(R.id.submit_master_password_btn);
-        mGoogleSignInButton.setOnClickListener(new OnClickListener() {
+        findViewById(R.id.submit_master_password_btn).setOnClickListener(new OnClickListener() {
             public void onClick(View view) {
                 attemptFirebaseLogin();
             }
