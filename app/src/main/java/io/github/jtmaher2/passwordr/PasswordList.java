@@ -460,8 +460,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             initial = true;
         }
 
-        final ProgressBar encryptingOrDeletingPasswordsProgressBar = findViewById(R.id.encryptingOrDeletingPasswordsProgressBar);
-        encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
+        final ProgressBar loadingPasswordsBar = findViewById(R.id.encryptingOrDeletingPasswordsProgressBar);
 
         // sort options
         final Spinner sortOptions = findViewById(R.id.sort_options);
@@ -586,7 +585,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                     mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
 
                                     final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
-                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.VISIBLE);
+                                    loadingPasswordsBar.setVisibility(View.VISIBLE);
 
                                     // re-encrypt everything using new master password
                                     for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
@@ -632,7 +631,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                             public void onSuccess(Void aVoid) {
                                                 numEncrypted[0]++;
                                                 if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
-                                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
+                                                    loadingPasswordsBar.setVisibility(View.GONE);
                                                     // sort A-Z
                                                     onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                                                 }
@@ -649,7 +648,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                     // if there are imported passwords,
                                     // delete all of this user's passwords from Firebase
                                     final int[] numAddedOrDeleted = {0}; // the number of passwords that have been added or deleted
-                                    encryptingOrDeletingPasswordsProgressBar.setVisibility(View.VISIBLE);
+                                    loadingPasswordsBar.setVisibility(View.VISIBLE);
                                     final int numPasswords = passwordsLayout[0].getChildCount();
                                     if (numPasswords > 0) {
                                         for (int password = 0; password < numPasswords; password++) {
@@ -694,7 +693,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                                                     Log.d(TAG, "DocumentSnapshot successfully written!");
                                                                                     numAddedOrDeleted[0]++;
                                                                                     if (numAddedOrDeleted[0] == mImportedPasswords.size()) {
-                                                                                        encryptingOrDeletingPasswordsProgressBar.setVisibility(View.GONE);
+                                                                                        loadingPasswordsBar.setVisibility(View.GONE);
                                                                                         // refresh list
                                                                                         startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                                                                         finish();
@@ -834,6 +833,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 // sort A-Z
                                 onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                             }
+                            
+                            loadingPasswordsBar.setVisibility(View.GONE); // all passwords downloaded
                         } else {
                             Log.w(TAG, "Error getting documents.", task.getException());
                         }
