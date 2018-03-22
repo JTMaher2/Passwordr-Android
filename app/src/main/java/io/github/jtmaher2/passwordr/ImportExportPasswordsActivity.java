@@ -26,6 +26,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_JSON = "application/octet-stream";
+
     private static final String ns = null;
     private String mMasterPassword;
     private String mType; // either XML or JSON
@@ -54,7 +55,12 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         goButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                mType = (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn ? TYPE_XML : TYPE_JSON);
+                if (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn ||
+                        xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                    mType = TYPE_XML;
+                } else {
+                    mType = TYPE_JSON;
+                }
 
                 if (importExport.getCheckedRadioButtonId() == R.id.importRadioBtn) {
                     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);

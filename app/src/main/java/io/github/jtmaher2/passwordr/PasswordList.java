@@ -12,7 +12,6 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.AppCompatDelegate;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
@@ -891,6 +890,17 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             public boolean onMenuItemClick(MenuItem menuItem) {
                 // take user to change master password activity
                 startActivity(ImportExportPasswordsActivity.createIntent(mContext, mMasterPassword));
+                finish();
+                return false;
+            }
+        });
+
+        MenuItem settings = menu.findItem(R.id.menu_settings);
+
+        settings.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                startActivity(SettingsActivity.createIntent(mContext, mMasterPassword));
                 finish();
                 return false;
             }

@@ -146,5 +146,7 @@
     <string name="json">JSON</string>
     <string name="import_str">Import</string>
     <string name="export">Export</string>
+    <string name="settings">Settings</string>
+    <string name="enable_pwned_npasswords_check">Enable Pwned Passwords Check?</string>
 
 </resources>

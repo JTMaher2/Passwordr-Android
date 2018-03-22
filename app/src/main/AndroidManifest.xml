@@ -74,6 +74,7 @@
         <activity android:name=".ChangeMasterPasswordActivity" />
         <activity android:name=".ImportExportPasswordsActivity">
         </activity>
+        <activity android:name=".SettingsActivity" />
     </application>
 
 </manifest>
