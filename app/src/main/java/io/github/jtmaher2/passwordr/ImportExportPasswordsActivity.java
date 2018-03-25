@@ -4,11 +4,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.JsonReader;
 import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -18,13 +21,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.List;
 
 public class ImportExportPasswordsActivity extends AppCompatActivity {
     static final int REQUEST_PASSWORD_IMPORT = 1;
     private static final String TAG = "ImportExportPasswords";
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TYPE_XML = "text/xml";
+    private static final String TYPE_KEEPASS = "text/keepass";
     private static final String TYPE_JSON = "application/octet-stream";
 
     private static final String ns = null;
@@ -48,6 +51,32 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         final RadioGroup importExport = findViewById(R.id.import_export_group),
                 xmlJson = findViewById(R.id.xml_json_group);
 
+        xmlJson.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(RadioGroup radioGroup, int i) {
+                if (radioGroup.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                    if (importExport.getCheckedRadioButtonId() == R.id.exportRadioBtn) {
+                        ((RadioButton)findViewById(R.id.exportRadioBtn)).toggle(); // turn off export button
+                        ((RadioButton)findViewById(R.id.importRadioBtn)).toggle(); // turn on import button
+                        Snackbar.make(findViewById(R.id.import_export_passwords_layout), "You can't export KeePass XML.", Snackbar.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
+
+        importExport.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(RadioGroup radioGroup, int i) {
+                if (radioGroup.getCheckedRadioButtonId() == R.id.exportRadioBtn) {
+                    if (xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                        ((RadioButton)findViewById(R.id.exportRadioBtn)).toggle(); // turn off export button
+                        ((RadioButton)findViewById(R.id.importRadioBtn)).toggle(); // turn on import button
+                        Snackbar.make(findViewById(R.id.import_export_passwords_layout), "You can't export KeePass XML.", Snackbar.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
+
         Bundle extras = getIntent().getExtras();
         mMasterPassword = extras == null ? "" : extras.getString(EXTRA_MASTER_PASSWORD);
 
@@ -55,16 +84,20 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         goButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                if (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn ||
-                        xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                if (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn) {
                     mType = TYPE_XML;
+                } else if (xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                    mType = TYPE_KEEPASS;
                 } else {
                     mType = TYPE_JSON;
                 }
 
                 if (importExport.getCheckedRadioButtonId() == R.id.importRadioBtn) {
                     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                    intent.setType(mType);
+                    if (mType.equals(TYPE_KEEPASS))
+                        intent.setType(TYPE_XML); // type/keepass is not valid, so replace
+                    else
+                        intent.setType(mType); // valid
                     if (intent.resolveActivity(getPackageManager()) != null) {
                         startActivityForResult(intent, REQUEST_PASSWORD_IMPORT);
                     }
@@ -96,10 +129,70 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         return passwords;
     }
 
+    private ArrayList<Password> readKeepassPasswords(XmlPullParser parser) throws XmlPullParserException, IOException {
+        ArrayList<Password> passwords = new ArrayList<>();
+
+        parser.require(XmlPullParser.START_TAG, ns, null);
+        while (parser.next() != XmlPullParser.END_TAG) {
+            if (parser.getEventType() != XmlPullParser.START_TAG) {
+                continue;
+            }
+            String elem = parser.getName();
+            // Starts by looking for the entry tag
+            if (elem.equals("Root")) {
+                String elem2 = parser.getName();
+                if (elem2.equals("Group")) {
+                    String elem3 = parser.getName();
+                    if (elem3.equals("Entry")) {
+                        passwords.add(readKeepassPassword(parser));
+                    }
+                }
+            } else {
+                skip(parser);
+            }
+        }
+        return passwords;
+    }
+
     // Parses the contents of a password. If it encounters a name, url, password, or note tag, hands them
     // off
     // to their respective "read" methods for processing. Otherwise, skips the tag.
     private Password readPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
+        parser.require(XmlPullParser.START_TAG, ns, "password");
+        String name = null;
+        String url = null;
+        String password = null;
+        String note = null;
+        while (parser.next() != XmlPullParser.END_TAG) {
+            if (parser.getEventType() != XmlPullParser.START_TAG) {
+                continue;
+            }
+            String field = parser.getName();
+            switch (field) {
+                case "name":
+                    name = readField(parser, field);
+                    break;
+                case "url":
+                    url = readField(parser, field);
+                    break;
+                case "password_str":
+                    password = readField(parser, field);
+                    break;
+                case "note":
+                    note = readField(parser, field);
+                    break;
+                default:
+                    skip(parser);
+                    break;
+            }
+        }
+        return new Password(name, url, password, note);
+    }
+
+    // Parses the contents of a password. If it encounters a name, url, password, or note tag, hands them
+    // off
+    // to their respective "read" methods for processing. Otherwise, skips the tag.
+    private Password readKeepassPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
         parser.require(XmlPullParser.START_TAG, ns, "password");
         String name = null;
         String url = null;
@@ -241,6 +334,12 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                                 parser.setInput(input, null);
                                 parser.nextTag();
                                 passwords = readPasswords(parser);
+                                break;
+                            case TYPE_KEEPASS:
+                                XmlPullParser keepassParser = Xml.newPullParser();
+                                keepassParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
+                                keepassParser.setInput(input, null);
+                                passwords = readKeepassPasswords(keepassParser);
                                 break;
                             case TYPE_JSON:
                                 try (JsonReader reader = new JsonReader(new InputStreamReader(input, "UTF-8"))) {

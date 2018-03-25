@@ -197,7 +197,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     View.OnClickListener editPasswordListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            final ViewGroup thisPassword = (ViewGroup)view.getParent();
+            final ViewGroup thisPassword = (ViewGroup)view.getParent().getParent();
             for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
                 View item = thisPassword.getChildAt(itemPos);
 
@@ -264,7 +264,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             Map<String, Object> newPassword = new HashMap<>();
             newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
             String key = ""; // the key that uniquely identifies this password
-            ViewGroup thisPassword = (ViewGroup)view.getParent();
+            ViewGroup thisPassword = (ViewGroup)view.getParent().getParent();
 
             for (int saveItemPos = 0; saveItemPos < thisPassword.getChildCount(); saveItemPos++) {
                 View item = thisPassword.getChildAt(saveItemPos);
@@ -579,8 +579,19 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
                             // if it's initial update
                             if (finalInitial) {
+
+                                /*if (mExportType != null) {
+                                    switch (mExportType) {
+                                        case TYPE_XML:
+                                            writeXMLFile();
+                                            break;
+                                        case TYPE_JSON:
+                                            writeJSONFile();
+                                            break;
+                                    }
+                                }
                                 // if user wants to change the master password
-                                if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
+                                else*/ if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
                                     mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
 
                                     final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
