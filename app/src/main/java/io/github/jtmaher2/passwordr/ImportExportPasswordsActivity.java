@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.JsonReader;
+import android.util.Log;
 import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
@@ -17,6 +18,7 @@ import android.widget.RadioGroup;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -146,6 +148,8 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                     if (elem3.equals("Entry")) {
                         passwords.add(readKeepassPassword(parser));
                     }
+                } else {
+                    skip(parser);
                 }
             } else {
                 skip(parser);
@@ -325,7 +329,6 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                 try {
                     input = getContentResolver().openInputStream(uri);
                     ArrayList<Password> passwords = null;
-
                     if (input != null) {
                         switch (mType) {
                             case TYPE_XML:
@@ -339,6 +342,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                                 XmlPullParser keepassParser = Xml.newPullParser();
                                 keepassParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
                                 keepassParser.setInput(input, null);
+                                keepassParser.nextTag();
                                 passwords = readKeepassPasswords(keepassParser);
                                 break;
                             case TYPE_JSON:
