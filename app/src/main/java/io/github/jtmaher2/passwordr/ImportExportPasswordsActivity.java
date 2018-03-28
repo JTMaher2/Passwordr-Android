@@ -15,6 +15,10 @@ import android.widget.CompoundButton;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -23,6 +27,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 
 public class ImportExportPasswordsActivity extends AppCompatActivity {
     static final int REQUEST_PASSWORD_IMPORT = 1;
@@ -142,14 +155,26 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
             String elem = parser.getName();
             // Starts by looking for the entry tag
             if (elem.equals("Root")) {
-                String elem2 = parser.getName();
-                if (elem2.equals("Group")) {
-                    String elem3 = parser.getName();
-                    if (elem3.equals("Entry")) {
-                        passwords.add(readKeepassPassword(parser));
+                while (parser.next() != XmlPullParser.END_TAG) {
+                    if (parser.getEventType() != XmlPullParser.START_TAG) {
+                        continue;
                     }
-                } else {
-                    skip(parser);
+                    String elem2 = parser.getName();
+                    if (elem2.equals("Group")) {
+                        while (parser.next() != XmlPullParser.END_TAG) {
+                            if (parser.getEventType() != XmlPullParser.START_TAG) {
+                                continue;
+                            }
+                            String elem3 = parser.getName();
+                            if (elem3.equals("Entry")) {
+                                passwords.add(readKeepassPassword(parser));
+                            } else {
+                                skip(parser);
+                            }
+                        }
+                    } else {
+                        skip(parser);
+                    }
                 }
             } else {
                 skip(parser);
@@ -159,8 +184,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
     }
 
     // Parses the contents of a password. If it encounters a name, url, password, or note tag, hands them
-    // off
-    // to their respective "read" methods for processing. Otherwise, skips the tag.
+    // off to their respective "read" methods for processing. Otherwise, skips the tag.
     private Password readPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
         parser.require(XmlPullParser.START_TAG, ns, "password");
         String name = null;
@@ -197,7 +221,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
     // off
     // to their respective "read" methods for processing. Otherwise, skips the tag.
     private Password readKeepassPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
-        parser.require(XmlPullParser.START_TAG, ns, "password");
+        parser.require(XmlPullParser.START_TAG, ns, "Entry");
         String name = null;
         String url = null;
         String password = null;
@@ -206,23 +230,35 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 continue;
             }
-            String field = parser.getName();
-            switch (field) {
-                case "name":
-                    name = readField(parser, field);
-                    break;
-                case "url":
-                    url = readField(parser, field);
-                    break;
-                case "password_str":
-                    password = readField(parser, field);
-                    break;
-                case "note":
-                    note = readField(parser, field);
-                    break;
-                default:
-                    skip(parser);
-                    break;
+            String field = parser.getName(),
+                    key = "";
+            if (field.equals("String")) {
+                while (parser.next() != XmlPullParser.END_TAG) {
+                    if (parser.getEventType() != XmlPullParser.START_TAG) {
+                        continue;
+                    }
+                    String field2 = parser.getName();
+                    if (field2.equals("Key")) {
+                        key = readField(parser, field2);
+                    } else {
+                        switch (key) {
+                            case "Title":
+                                name = readField(parser, field2);
+                                break;
+                            case "URL":
+                                url = readField(parser, field2);
+                                break;
+                            case "Password":
+                                password = readField(parser, field2);
+                                break;
+                            case "Notes":
+                                note = readField(parser, field2);
+                                break;
+                        }
+                    }
+                }
+            } else {
+                skip(parser);
             }
         }
         return new Password(name, url, password, note);
@@ -317,6 +353,70 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         return passwords;
     }
 
+    // adds KeePass XML passwords to list based on XPath expression
+    private void addKeePassXMLPasswordsToList(XPath xpath, XPathExpression expr,
+                                           Document doc, ArrayList<Password> passwords) throws XPathExpressionException {
+        NodeList entries = (NodeList) expr.evaluate(doc, XPathConstants.NODESET);
+
+        for (int entryIdx = 0; entryIdx < entries.getLength(); entryIdx++) {
+            Node entry = entries.item(entryIdx);
+
+            // get title
+            String titleStr = "";
+            XPathExpression titleExpr = xpath.compile("./String[Key = \"Title\"]");
+            NodeList titles = (NodeList) titleExpr.evaluate(entry, XPathConstants.NODESET);
+            for (int titleIdx = 0; titleIdx < titles.getLength(); titleIdx++) {
+                Node title = titles.item(titleIdx);
+                XPathExpression titleValExpr = xpath.compile("./Value");
+                NodeList titleVals = (NodeList) titleValExpr.evaluate(title, XPathConstants.NODESET);
+                for (int titleVal = 0; titleVal < titleVals.getLength(); titleVal++) {
+                    titleStr = titleVals.item(titleVal).getTextContent();
+                }
+            }
+
+            // get URL
+            String urlStr = "";
+            XPathExpression urlExpr = xpath.compile("./String[Key = \"URL\"]");
+            NodeList urls = (NodeList) urlExpr.evaluate(entry, XPathConstants.NODESET);
+            for (int urlIdx = 0; urlIdx < urls.getLength(); urlIdx++) {
+                Node url = urls.item(urlIdx);
+                XPathExpression urlValExpr = xpath.compile("./Value");
+                NodeList urlVals = (NodeList) urlValExpr.evaluate(url, XPathConstants.NODESET);
+                for (int urlVal = 0; urlVal < urlVals.getLength(); urlVal++) {
+                    urlStr = urlVals.item(urlVal).getTextContent();
+                }
+            }
+
+            // get password
+            String passwordStr = "";
+            XPathExpression passwordExpr = xpath.compile("./String[Key = \"Password\"]");
+            NodeList passwordNodes = (NodeList) passwordExpr.evaluate(entry, XPathConstants.NODESET);
+            for (int passwordIdx = 0; passwordIdx < passwordNodes.getLength(); passwordIdx++) {
+                Node password = passwordNodes.item(passwordIdx);
+                XPathExpression passwordValExpr = xpath.compile("./Value");
+                NodeList passwordVals = (NodeList) passwordValExpr.evaluate(password, XPathConstants.NODESET);
+                for (int passwordVal = 0; passwordVal < passwordVals.getLength(); passwordVal++) {
+                    passwordStr = passwordVals.item(passwordVal).getTextContent();
+                }
+            }
+
+            // get note
+            String noteStr = "";
+            XPathExpression noteExpr = xpath.compile("./String[Key = \"Note\"]");
+            NodeList notes = (NodeList) noteExpr.evaluate(entry, XPathConstants.NODESET);
+            for (int noteIdx = 0; noteIdx < notes.getLength(); noteIdx++) {
+                Node note = notes.item(noteIdx);
+                XPathExpression noteValExpr = xpath.compile("./Value");
+                NodeList noteVals = (NodeList) noteValExpr.evaluate(note, XPathConstants.NODESET);
+                for (int noteVal = 0; noteVal < noteVals.getLength(); noteVal++) {
+                    noteStr = noteVals.item(noteVal).getTextContent();
+                }
+            }
+
+            passwords.add(new Password(titleStr, urlStr, passwordStr, noteStr));
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -339,11 +439,19 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                                 passwords = readPasswords(parser);
                                 break;
                             case TYPE_KEEPASS:
-                                XmlPullParser keepassParser = Xml.newPullParser();
-                                keepassParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
-                                keepassParser.setInput(input, null);
-                                keepassParser.nextTag();
-                                passwords = readKeepassPasswords(keepassParser);
+                                passwords = new ArrayList<>();
+                                DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                                DocumentBuilder builder = factory.newDocumentBuilder();
+                                Document doc = builder.parse(input);
+                                XPathFactory xPathfactory = XPathFactory.newInstance();
+                                XPath xpath = xPathfactory.newXPath();
+
+                                XPathExpression outerEntriesExpr = xpath.compile("/KeePassFile/Root/Group/Entry");
+                                addKeePassXMLPasswordsToList(xpath, outerEntriesExpr, doc, passwords);
+
+                                XPathExpression innerEntriesExpr = xpath.compile("/KeePassFile/Root/Group/Group/Entry");
+                                addKeePassXMLPasswordsToList(xpath, innerEntriesExpr, doc, passwords);
+
                                 break;
                             case TYPE_JSON:
                                 try (JsonReader reader = new JsonReader(new InputStreamReader(input, "UTF-8"))) {
@@ -356,7 +464,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                     // go back to passwords list, passing the new passwords as an extra
                     startActivity(PasswordList.createIntent(getApplicationContext(), null, mMasterPassword, null, null, passwords, null));
                     finish();
-                } catch (IOException | XmlPullParserException e) {
+                } catch (IOException | XmlPullParserException | ParserConfigurationException | XPathExpressionException | SAXException e) {
                     e.printStackTrace();
                 } finally {
                     try {
