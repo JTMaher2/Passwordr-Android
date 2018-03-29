@@ -123,6 +123,18 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                 }
             }
         });
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        // go back to list
+        startActivity(PasswordList.createIntent(getApplicationContext(), null, mMasterPassword, null, null, null, null));
+        finish();
+        return super.onSupportNavigateUp();
     }
 
     private ArrayList<Password> readPasswords(XmlPullParser parser) throws XmlPullParserException, IOException {

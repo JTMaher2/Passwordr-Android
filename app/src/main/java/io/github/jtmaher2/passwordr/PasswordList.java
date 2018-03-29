@@ -773,7 +773,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                             for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
                                                 // get card
                                                 LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
-                                                String name = "", url = "", passwordStr = "", note = "", key = "";
+                                                String name = "", url = "", passwordStr = "", note = "";
 
                                                 // get key, name, url, password, and note of each password
                                                 for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
