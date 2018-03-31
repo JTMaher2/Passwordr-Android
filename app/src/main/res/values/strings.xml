@@ -117,10 +117,10 @@
     <string name="format_url">URL: <xliff:g id="url">%1$s</xliff:g></string>
     <string name="format_password">Password: <xliff:g id="password">%1$s</xliff:g></string>
     <string name="format_note">Note: <xliff:g id="note">%1$s</xliff:g></string>
-    <string name="name_label">Name:</string>
-    <string name="url_label">URL:</string>
-    <string name="password_label">Password:</string>
-    <string name="note_label">Note:</string>
+    <string name="name_label">Name: </string>
+    <string name="url_label">URL: </string>
+    <string name="password_label">Password: </string>
+    <string name="note_label">Note: </string>
     <string name="show">Show</string>
     <string name="edit">Edit</string>
     <string name="note">Note:</string>
@@ -148,5 +148,6 @@
     <string name="export">Export</string>
     <string name="settings">Settings</string>
     <string name="enable_pwned_npasswords_check">Enable Pwned Passwords Check?</string>
-
+    <string name="do_pwned_passwords_check_on_all_passwords">Check All Passwords</string>
+    <string name="check">Check</string>
 </resources>

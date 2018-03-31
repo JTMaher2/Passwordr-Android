@@ -1,9 +1,13 @@
 package io.github.jtmaher2.passwordr;
 
+import android.app.ActionBar;
 import android.app.SearchManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Parcel;
@@ -11,6 +15,7 @@ import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
@@ -52,7 +57,13 @@ import org.xmlpull.v1.XmlSerializer;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -67,10 +78,17 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
+import static android.graphics.Color.GREEN;
+import static android.graphics.Color.RED;
+import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static com.firebase.ui.auth.util.ExtraConstants.EXTRA_IDP_RESPONSE;
 
 public class PasswordList extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final String TAG = "PasswordList";
+    private static final String MY_PREFS_NAME = "PasswordrPreferences";
+    private static final String PWNED_PASSWORDS_ENABLED = "PwnedPasswordsEnabled";
+
     private static final int IV_LEN = 12;
     private static final int MASTER_PASSWORD_LENGTH = 32;
     private static final int NAME_TEXT_VIEW = 42;
@@ -97,6 +115,162 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private String mExportType;
 
     private boolean mFilter = false; // initially, do not display "Clear" option
+
+    private static class PwnedPasswordsDownloaderTask extends AsyncTask<String, Void, ArrayList<String>> {
+        String mPassword;
+        WeakReference mPasswordsList;
+
+        PwnedPasswordsDownloaderTask(LinearLayout passwordsList) {
+            mPasswordsList = new WeakReference(passwordsList);
+        }
+
+        private String byteArrayToHexString(byte[] b) {
+            StringBuilder result = new StringBuilder();
+            for (byte aB : b) {
+                result.append(Integer.toString((aB & 0xff) + 0x100, 16).substring(1));
+            }
+            return result.toString();
+        }
+
+        private String toSHA1(byte[] convertme) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance("SHA-1");
+            }
+            catch(NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            if (md != null) {
+                return byteArrayToHexString(md.digest(convertme));
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        // Actual download method, run in the task thread
+        protected ArrayList<String> doInBackground(String... params) {
+            mPassword = params[0];
+
+            String sha1Password = toSHA1(mPassword.getBytes());
+
+            if (sha1Password != null) {
+                return downloadPwnedPasswordMatches(new Uri.Builder().scheme("https")
+                        .authority("api.pwnedpasswords.com")
+                        .appendPath("range")
+                        .appendPath(sha1Password.substring(0, 5))
+                        .build().toString());
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        // Once the list is downloaded, check each of the hashes to see if it's a match
+        protected void onPostExecute(ArrayList<String> matches) {
+            int numNonMatches = 0;
+
+            if (matches != null) {
+                for (String match : matches) {
+                    if ((mPassword.substring(0, 5) + match).equals(mPassword)) {
+                        // mark it as pwned
+                        for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
+                            ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+
+                            // find any layout that contains this password, and color it red
+                            for (int j = 0; j < password.getChildCount(); j++) {
+                                if (password.getChildAt(j) instanceof ViewGroup) {
+                                    for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
+                                        if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
+                                            // if this is the layout of a matching password
+                                            if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
+                                                (password.getChildAt(j)).setBackgroundColor(RED);
+                                                ((ViewGroup) password.getChildAt(j)).getChildAt(k).setVisibility(View.VISIBLE); // reveal
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    } else {
+                        numNonMatches++;
+                    }
+                }
+
+                // if there were no matches
+                if (numNonMatches == matches.size()) {
+                    for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
+                        ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+
+                        // find any layout that contains this password, and color it green
+                        for (int j = 0; j < password.getChildCount(); j++) {
+                            if (password.getChildAt(j) instanceof ViewGroup) {
+                                for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
+                                    if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
+                                        // if this is the layout of the password
+                                        if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
+                                            (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
+                    ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+
+                    // find any layout that contains this password, and color it green
+                    for (int j = 0; j < password.getChildCount(); j++) {
+                        if (password.getChildAt(j) instanceof ViewGroup) {
+                            for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
+                                if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
+                                    // if this is the layout of the password
+                                    if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
+                                        (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private ArrayList<String> downloadPwnedPasswordMatches(String urlStr) {
+            ArrayList<String> matches = new ArrayList<>();
+            StringBuilder sb = new StringBuilder();
+
+            try {
+                URL url = new URL(urlStr);
+                HttpURLConnection con = (HttpURLConnection)url.openConnection();
+                InputStream is = con.getInputStream();
+                int i;
+                boolean inCount = false; // not in the ":XX" segment at end of hash
+                while ((i = is.read()) != -1) {
+                    if (!inCount) {
+                        if ((char) i == ':') {
+                            matches.add(sb.toString());
+                            sb.delete(0, sb.length()); // clear
+                            inCount = true;
+                        } else {
+                            sb.append((char) i);
+                        }
+                    } else { // it is in the ":XX" segment at end of hash
+                        if ((char) i == '\n') {
+                            inCount = false;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage());
+            }
+
+            return matches;
+        }
+    }
 
     public static Intent createIntent(
             Context context,
@@ -253,6 +427,26 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             // take user to confirm delete password activity
             startActivity(ConfirmDeletePasswordActivity.createIntent(mContext, mMasterPassword, key));
             finish();
+        }
+    };
+
+    // check if password has been pwned
+    View.OnClickListener checkPwnedListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            LinearLayout passwordCard = (LinearLayout)view.getParent().getParent();
+            String password = "";
+            for (int i = 0; i < passwordCard.getChildCount(); i++) {
+                if (passwordCard.getChildAt(i) instanceof LinearLayout) {
+                    for (int j = 0; j < ((LinearLayout) passwordCard.getChildAt(i)).getChildCount(); j++) {
+                        if (((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j).getId() == PASSWORD_TEXT_VIEW) {
+                            password = ((TextView)(((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j))).getText().toString();
+                            break;
+                        }
+                    }
+                }
+            }
+            new PwnedPasswordsDownloaderTask((LinearLayout)findViewById(R.id.passwords_layout)).execute(password);
         }
     };
 
@@ -513,6 +707,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 // password
                                 LinearLayout passwordLayout = new LinearLayout(mContext);
                                 passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                passwordLayout.setMinimumWidth(MATCH_PARENT);
+                                passwordLayout.setMinimumHeight(WRAP_CONTENT);
                                 TextView passwordLabelTextView = new TextView(mContext);
                                 passwordLabelTextView.setText(R.string.password_label);
                                 passwordLayout.addView(passwordLabelTextView);
@@ -522,7 +718,14 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 passwordTextView.setVisibility(View.INVISIBLE);
                                 passwordTextView.setTextIsSelectable(true);
                                 passwordLayout.addView(passwordTextView);
+                                View emptyView = new View(mContext);
+                                emptyView.setMinimumWidth(0);
+                                emptyView.setMinimumHeight(0);
+                                emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                                passwordLayout.addView(emptyView);
                                 Button showPasswordButton = new Button(mContext);
+                                showPasswordButton.setWidth(WRAP_CONTENT);
+                                showPasswordButton.setHeight(WRAP_CONTENT);
                                 showPasswordButton.setText(R.string.show);
                                 showPasswordButton.setOnClickListener(showPasswordListener);
                                 passwordLayout.addView(showPasswordButton);
@@ -545,23 +748,31 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 passwordCard.addView(noteLayout);
 
                                 // Edit & Delete button layout
-                                LinearLayout editAndDeleteButtons = new LinearLayout(mContext);
-                                editAndDeleteButtons.setId(EDIT_AND_DELETE_BUTTONS);
-                                editAndDeleteButtons.setOrientation(LinearLayout.HORIZONTAL);
+                                LinearLayout editDeleteAndCheckButtons = new LinearLayout(mContext);
+                                editDeleteAndCheckButtons.setId(EDIT_AND_DELETE_BUTTONS);
+                                editDeleteAndCheckButtons.setOrientation(LinearLayout.HORIZONTAL);
 
                                 // Edit button
                                 Button editButton = new Button(mContext);
                                 editButton.setText(R.string.edit);
                                 editButton.setOnClickListener(editPasswordListener);
-                                editAndDeleteButtons.addView(editButton);
+                                editDeleteAndCheckButtons.addView(editButton);
 
                                 // Delete button
                                 Button deleteButton = new Button(mContext);
                                 deleteButton.setText(R.string.delete);
                                 deleteButton.setOnClickListener(deletePasswordListener);
-                                editAndDeleteButtons.addView(deleteButton);
+                                editDeleteAndCheckButtons.addView(deleteButton);
 
-                                passwordCard.addView(editAndDeleteButtons);
+                                // if user has enabled pwned passwords, add additional "Check" button
+                                if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
+                                    Button checkPwnedButton = new Button(mContext);
+                                    checkPwnedButton.setText(R.string.check);
+                                    checkPwnedButton.setOnClickListener(checkPwnedListener);
+                                    editDeleteAndCheckButtons.addView(checkPwnedButton);
+                                }
+
+                                passwordCard.addView(editDeleteAndCheckButtons);
 
                                 // Password ID
                                 TextView passwordID = new TextView(mContext);
@@ -917,7 +1128,54 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             }
         });
 
+        MenuItem pwnedPasswords = menu.findItem(R.id.menu_pwned_passwords);
+        pwnedPasswords.setVisible(getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false));
+        pwnedPasswords.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+           @Override
+           public boolean onMenuItemClick(MenuItem menuItem) {
+               doPwnedCheckOnAllPasswords();
+               return false;
+           }
+        });
+
         return true;
+    }
+
+    // checks all passwords to see if they have been pwned
+    private void doPwnedCheckOnAllPasswords() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(mContext, android.R.style.Theme_Material_Dialog_Alert);
+        builder.setTitle("Pwned Passwords Check All?")
+                .setMessage("Are you sure you want to check every password against the Pwned Passwords API?")
+                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        // continue with check
+                        LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
+
+                        for (int i = 0; i < passwordsLayout.getChildCount(); i++) {
+                            ViewGroup password = (ViewGroup)passwordsLayout.getChildAt(i);
+                            for (int j = 0; j < password.getChildCount(); j++) {
+                                View passwordProp = password.getChildAt(j);
+
+                                if (passwordProp instanceof LinearLayout) {
+                                    for (int k = 0; k < ((ViewGroup)passwordProp).getChildCount(); k++) {
+                                        if (((ViewGroup)passwordProp).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
+                                            String passwordStr = ((TextView)((ViewGroup)passwordProp).getChildAt(k)).getText().toString();
+                                            new PwnedPasswordsDownloaderTask(passwordsLayout).execute(passwordStr);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        // do nothing
+                    }
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
     }
 
     @Override

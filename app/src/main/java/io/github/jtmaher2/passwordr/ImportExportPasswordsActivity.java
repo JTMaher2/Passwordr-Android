@@ -7,11 +7,9 @@ import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.JsonReader;
-import android.util.Log;
 import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
@@ -22,7 +20,6 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -156,45 +153,6 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         return passwords;
     }
 
-    private ArrayList<Password> readKeepassPasswords(XmlPullParser parser) throws XmlPullParserException, IOException {
-        ArrayList<Password> passwords = new ArrayList<>();
-
-        parser.require(XmlPullParser.START_TAG, ns, null);
-        while (parser.next() != XmlPullParser.END_TAG) {
-            if (parser.getEventType() != XmlPullParser.START_TAG) {
-                continue;
-            }
-            String elem = parser.getName();
-            // Starts by looking for the entry tag
-            if (elem.equals("Root")) {
-                while (parser.next() != XmlPullParser.END_TAG) {
-                    if (parser.getEventType() != XmlPullParser.START_TAG) {
-                        continue;
-                    }
-                    String elem2 = parser.getName();
-                    if (elem2.equals("Group")) {
-                        while (parser.next() != XmlPullParser.END_TAG) {
-                            if (parser.getEventType() != XmlPullParser.START_TAG) {
-                                continue;
-                            }
-                            String elem3 = parser.getName();
-                            if (elem3.equals("Entry")) {
-                                passwords.add(readKeepassPassword(parser));
-                            } else {
-                                skip(parser);
-                            }
-                        }
-                    } else {
-                        skip(parser);
-                    }
-                }
-            } else {
-                skip(parser);
-            }
-        }
-        return passwords;
-    }
-
     // Parses the contents of a password. If it encounters a name, url, password, or note tag, hands them
     // off to their respective "read" methods for processing. Otherwise, skips the tag.
     private Password readPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
@@ -224,53 +182,6 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                 default:
                     skip(parser);
                     break;
-            }
-        }
-        return new Password(name, url, password, note);
-    }
-
-    // Parses the contents of a password. If it encounters a name, url, password, or note tag, hands them
-    // off
-    // to their respective "read" methods for processing. Otherwise, skips the tag.
-    private Password readKeepassPassword(XmlPullParser parser) throws XmlPullParserException, IOException {
-        parser.require(XmlPullParser.START_TAG, ns, "Entry");
-        String name = null;
-        String url = null;
-        String password = null;
-        String note = null;
-        while (parser.next() != XmlPullParser.END_TAG) {
-            if (parser.getEventType() != XmlPullParser.START_TAG) {
-                continue;
-            }
-            String field = parser.getName(),
-                    key = "";
-            if (field.equals("String")) {
-                while (parser.next() != XmlPullParser.END_TAG) {
-                    if (parser.getEventType() != XmlPullParser.START_TAG) {
-                        continue;
-                    }
-                    String field2 = parser.getName();
-                    if (field2.equals("Key")) {
-                        key = readField(parser, field2);
-                    } else {
-                        switch (key) {
-                            case "Title":
-                                name = readField(parser, field2);
-                                break;
-                            case "URL":
-                                url = readField(parser, field2);
-                                break;
-                            case "Password":
-                                password = readField(parser, field2);
-                                break;
-                            case "Notes":
-                                note = readField(parser, field2);
-                                break;
-                        }
-                    }
-                }
-            } else {
-                skip(parser);
             }
         }
         return new Password(name, url, password, note);
