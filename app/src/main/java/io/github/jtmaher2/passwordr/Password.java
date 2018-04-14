@@ -15,14 +15,14 @@ public class Password implements Parcelable {
     public final String password;
     public final String note;
 
-    protected Password(Parcel in) {
+    private Password(Parcel in) {
         name = in.readString();
         url = in.readString();
         password = in.readString();
         note = in.readString();
     }
 
-    public Password(String name, String url, String password, String note) {
+    Password(String name, String url, String password, String note) {
         this.name = name;
         this.url = url;
         this.password = password;

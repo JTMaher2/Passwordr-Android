@@ -21,19 +21,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
-import com.twitter.sdk.android.core.DefaultLogger;
-import com.twitter.sdk.android.core.Twitter;
-import com.twitter.sdk.android.core.TwitterAuthConfig;
-import com.twitter.sdk.android.core.TwitterConfig;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import static android.Manifest.permission.READ_CONTACTS;
 
@@ -63,9 +56,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private UserLoginTask mAuthTask = null;
 
     // UI references.
-    private EditText mPasswordView;
     private View mProgressView;
-    private View mLoginFormView;
     private EditText mMasterPasswordInput;
 
     private ArrayList<AuthUI.IdpConfig> mSignInProviders;
@@ -78,25 +69,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
-        //populateAutoComplete();
-        /*TwitterAuthConfig authConfig = new TwitterAuthConfig(getResources().getString(R.string.twitter_consumer_key), getResources().getString(R.string.twitter_consumer_secret));
-        TwitterConfig config = new TwitterConfig.Builder(this)
-                .logger(new DefaultLogger(Log.DEBUG))
-                .twitterAuthConfig(authConfig)
-                .debug(true)
-                .build();
-        Twitter.initialize(config);*/
-        /*mPasswordView = findViewById(R.id.password);
-        mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
-                if (id == EditorInfo.IME_ACTION_DONE || id == EditorInfo.IME_NULL) {
-                    attemptLogin();
-                    return true;
-                }
-                return false;
-            }
-        });*/
+
         mSignInProviders = new ArrayList<>();
         mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build());
         mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build());
@@ -128,11 +101,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
             handleSignInResponse(resultCode, data);
 
-            return;
-
         }
-        //showSnackbar(R.string.unknown_response);
-
     }
 
     private boolean mayRequestContacts() {
@@ -140,14 +109,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             return true;
         }
         if (shouldShowRequestPermissionRationale(READ_CONTACTS)) {
-            /*Snackbar.make(mEmailView, R.string.permission_rationale, Snackbar.LENGTH_INDEFINITE)
-                    .setAction(android.R.string.ok, new View.OnClickListener() {
-                        @Override
-                        @TargetApi(Build.VERSION_CODES.M)
-                        public void onClick(View v) {
-                            requestPermissions(new String[]{READ_CONTACTS}, REQUEST_READ_CONTACTS);
-                        }
-                    });*/
             Log.d(TAG, getString(R.string.permission_rationale));
         } else {
             requestPermissions(new String[]{READ_CONTACTS}, REQUEST_READ_CONTACTS);
@@ -176,27 +137,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         if (resultCode == RESULT_OK) {
             startSignedInActivity(response);
             finish();
-            //return;
-        } //else {
-            // Sign in failed
-            //if (response == null) {
-                // User pressed back button
-                //showSnackbar(R.string.sign_in_cancelled);
-                //return;
-            //}
-
-            //if (response.getErrorCode() == ErrorCodes.NO_NETWORK) {
-                //showSnackbar(R.string.no_internet_connection);
-                //return;
-            //}
-
-            //if (response.getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
-                //showSnackbar(R.string.unknown_error);
-                //return;
-            //}
-        //}
-
-        //showSnackbar(R.string.unknown_sign_in_resource);
+        }
     }
 
     private void startSignedInActivity(IdpResponse response) {
@@ -225,28 +166,19 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             return;
         }
 
-        boolean cancel = false;
-        View focusView = null;
-
-        if (cancel) {
-            // There was an error; don't attempt login and focus the first
-            // form field with an error.
-            focusView.requestFocus();
-        } else {
-            // Show a progress spinner, and kick off a background task to
-            // perform the user login attempt.
-            showProgress(true);
-            startActivityForResult(
-                    AuthUI.getInstance().createSignInIntentBuilder()
-                            .setTheme(AuthUI.getDefaultTheme())
-                            .setLogo(AuthUI.NO_LOGO)
-                            .setAvailableProviders(mSignInProviders)
-                            .setTosUrl(FIREBASE_TOS_URL)
-                            .setPrivacyPolicyUrl(FIREBASE_PRIVACY_POLICY_URL)
-                            .setIsSmartLockEnabled(false)
-                            .build(),
-                    RC_SIGN_IN);
-        }
+        // Show a progress spinner, and kick off a background task to
+        // perform the user login attempt.
+        showProgress(true);
+        startActivityForResult(
+                AuthUI.getInstance().createSignInIntentBuilder()
+                        .setTheme(AuthUI.getDefaultTheme())
+                        .setLogo(AuthUI.NO_LOGO)
+                        .setAvailableProviders(mSignInProviders)
+                        .setTosUrl(FIREBASE_TOS_URL)
+                        .setPrivacyPolicyUrl(FIREBASE_PRIVACY_POLICY_URL)
+                        .setIsSmartLockEnabled(false)
+                        .build(),
+                RC_SIGN_IN);
     }
 
     /**
@@ -258,15 +190,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         // for very easy animations. If available, use these APIs to fade-in
         // the progress spinner.
         int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
-
-/*        mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-        mLoginFormView.animate().setDuration(shortAnimTime).alpha(
-                show ? 0 : 1).setListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-            }
-        });*/
 
         mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
         mProgressView.animate().setDuration(shortAnimTime).alpha(
@@ -296,29 +219,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
-        List<String> emails = new ArrayList<>();
-        cursor.moveToFirst();
-        while (!cursor.isAfterLast()) {
-            emails.add(cursor.getString(ProfileQuery.ADDRESS));
-            cursor.moveToNext();
-        }
+    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
 
-        addEmailsToAutoComplete(emails);
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> cursorLoader) {
+    public void onLoaderReset(Loader<Cursor> loader) {
 
-    }
-
-    private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
-        //Create adapter to tell the AutoCompleteTextView what to show in its dropdown list.
-        ArrayAdapter<String> adapter =
-                new ArrayAdapter<>(LoginActivity.this,
-                        android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
-
-        //mEmailView.setAdapter(adapter);
     }
 
 
@@ -327,9 +234,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 ContactsContract.CommonDataKinds.Email.ADDRESS,
                 ContactsContract.CommonDataKinds.Email.IS_PRIMARY,
         };
-
-        int ADDRESS = 0;
-        int IS_PRIMARY = 1;
     }
 
     /**
@@ -376,9 +280,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
             if (success) {
                 finish();
-            } else {
-                mPasswordView.setError(getString(R.string.error_incorrect_password));
-                mPasswordView.requestFocus();
             }
         }
 
