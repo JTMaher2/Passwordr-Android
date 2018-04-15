@@ -40,6 +40,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_KEEPASS = "text/keepass";
+    private static final String TYPE_CSV = "text/csv";
     private static final String TYPE_JSON = "application/octet-stream";
 
     private static final String ns = null;
@@ -63,7 +64,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         final RadioGroup importExport = findViewById(R.id.import_export_group),
                 xmlJson = findViewById(R.id.xml_json_group);
 
-        xmlJson.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener(){
+        /*xmlJson.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener(){
             @Override
             public void onCheckedChanged(RadioGroup radioGroup, int i) {
                 if (radioGroup.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
@@ -87,7 +88,7 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                     }
                 }
             }
-        });
+        });*/
 
         Bundle extras = getIntent().getExtras();
         mMasterPassword = extras == null ? "" : extras.getString(EXTRA_MASTER_PASSWORD);
@@ -115,6 +116,9 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
                     }
                 } else {
                     // export
+                    if (mType.equals(TYPE_KEEPASS))
+                        mType = TYPE_CSV; // change to CSV
+
                     startActivity(PasswordList.createIntent(getApplicationContext(), null, mMasterPassword, null, null, null, mType));
                     finish();
                 }

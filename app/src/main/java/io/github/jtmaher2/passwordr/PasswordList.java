@@ -99,6 +99,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final int PASSWORD_ID = 47;
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_JSON = "application/octet-stream";
+    private static final String TYPE_CSV = "text/csv";
+
     private static final int REQUEST_WRITE_STORAGE = 112;
     private ArrayList<Password> mSerializedPasswords;
     FirebaseAuth mAuth;
@@ -574,6 +576,29 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    // convert password list to CSV file, and save to disk
+    private void writeCSVFile() {
+        StringBuilder output = new StringBuilder();
+
+        output.append("title, url, password, note\n");
+
+        try {
+            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOWNLOADS), "passwords.csv"));
+
+            for (int p = 0; p < mSerializedPasswords.size(); p++) {
+                output.append(mSerializedPasswords.get(p).name).append(',')
+                            .append(mSerializedPasswords.get(p).url).append(',')
+                            .append(mSerializedPasswords.get(p).password).append(',')
+                            .append(mSerializedPasswords.get(p).note).append('\n');
+            }
+            fileos.write(output.toString().getBytes());
+            fileos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -588,6 +613,9 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                             break;
                         case TYPE_JSON:
                             writeJSONFile();
+                            break;
+                        case TYPE_CSV:
+                            writeCSVFile();
                             break;
                     }
                 } else
@@ -1025,6 +1053,9 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                         break;
                                                     case TYPE_JSON:
                                                         writeJSONFile();
+                                                        break;
+                                                    case TYPE_CSV:
+                                                        writeCSVFile();
                                                         break;
                                                 }
                                             } else {
