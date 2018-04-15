@@ -118,10 +118,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
     private static class PwnedPasswordsDownloaderTask extends AsyncTask<String, Void, ArrayList<String>> {
         String mPassword;
-        WeakReference mPasswordsList;
+        WeakReference<LinearLayout> mPasswordsList;
 
         PwnedPasswordsDownloaderTask(LinearLayout passwordsList) {
-            mPasswordsList = new WeakReference(passwordsList);
+            mPasswordsList = new WeakReference<>(passwordsList);
         }
 
         private String byteArrayToHexString(byte[] b) {
@@ -174,8 +174,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 for (String match : matches) {
                     if ((mPassword.substring(0, 5) + match).equals(mPassword)) {
                         // mark it as pwned
-                        for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
-                            ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+                        for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
+                            ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
                             // find any layout that contains this password, and color it red
                             for (int j = 0; j < password.getChildCount(); j++) {
@@ -200,8 +200,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
                 // if there were no matches
                 if (numNonMatches == matches.size()) {
-                    for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
-                        ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+                    for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
+                        ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
                         // find any layout that contains this password, and color it green
                         for (int j = 0; j < password.getChildCount(); j++) {
@@ -219,8 +219,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     }
                 }
             } else {
-                for (int i = 0; i < ((LinearLayout) mPasswordsList.get()).getChildCount(); i++) {
-                    ViewGroup password = (ViewGroup) (((LinearLayout) mPasswordsList.get()).getChildAt(i));
+                for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
+                    ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
                     // find any layout that contains this password, and color it green
                     for (int j = 0; j < password.getChildCount(); j++) {
