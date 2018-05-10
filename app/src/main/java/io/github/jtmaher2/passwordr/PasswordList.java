@@ -587,10 +587,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     Environment.DIRECTORY_DOWNLOADS), "passwords.csv"));
 
             for (int p = 0; p < mSerializedPasswords.size(); p++) {
-                output.append(mSerializedPasswords.get(p).name).append(',')
-                            .append(mSerializedPasswords.get(p).url).append(',')
-                            .append(mSerializedPasswords.get(p).password).append(',')
-                            .append(mSerializedPasswords.get(p).note).append('\n');
+                output.append(mSerializedPasswords.get(p).name.replace('\n', ' ')).append(',')
+                            .append(mSerializedPasswords.get(p).url.replace('\n', ' ')).append(',')
+                            .append(mSerializedPasswords.get(p).password.replace('\n', ' ')).append(',')
+                            .append(mSerializedPasswords.get(p).note.replace('\n', ' ')).append('\n');
             }
             fileos.write(output.toString().getBytes());
             fileos.close();
