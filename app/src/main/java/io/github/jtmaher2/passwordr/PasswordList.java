@@ -2,6 +2,8 @@ package io.github.jtmaher2.passwordr;
 
 import android.app.ActionBar;
 import android.app.SearchManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -9,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -21,6 +24,8 @@ import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.util.Xml;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -88,15 +93,21 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final String TAG = "PasswordList";
     private static final String MY_PREFS_NAME = "PasswordrPreferences";
     private static final String PWNED_PASSWORDS_ENABLED = "PwnedPasswordsEnabled";
+    private static final String NUM_SECONDS_BEFORE_CLIPBOARD_CLEAR = "NumSecondsBeforeClipboardClear";
+    private static final int DEFAULT_SECONDS_BEFORE_CLIPBOARD_CLEAR = 12;
+    private static final int MILLISECONDS_IN_SECOND = 1000;
 
     private static final int IV_LEN = 12;
     private static final int MASTER_PASSWORD_LENGTH = 32;
+    private static final int PASSWORD_TEXT_SIZE = 20;
     private static final int NAME_TEXT_VIEW = 42;
     private static final int URL_TEXT_VIEW = 43;
     private static final int PASSWORD_TEXT_VIEW = 44;
     private static final int NOTE_TEXT_VIEW = 45;
     private static final int EDIT_AND_DELETE_BUTTONS = 46;
     private static final int PASSWORD_ID = 47;
+    private static final int PASSWORD_LAYOUT = 48;
+    private static final int PASSWORD_LABEL_LAYOUT = 49;
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_JSON = "application/octet-stream";
     private static final String TYPE_CSV = "text/csv";
@@ -183,11 +194,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                             for (int j = 0; j < password.getChildCount(); j++) {
                                 if (password.getChildAt(j) instanceof ViewGroup) {
                                     for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                        if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
-                                            // if this is the layout of a matching password
-                                            if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
-                                                (password.getChildAt(j)).setBackgroundColor(RED);
-                                                ((ViewGroup) password.getChildAt(j)).getChildAt(k).setVisibility(View.VISIBLE); // reveal
+                                        if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
+                                            for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
+                                                // if this is the layout of a matching password
+                                                if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
+                                                        ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
+                                                    (password.getChildAt(j)).setBackgroundColor(RED);
+                                                }
                                             }
                                         }
                                     }
@@ -209,10 +222,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                         for (int j = 0; j < password.getChildCount(); j++) {
                             if (password.getChildAt(j) instanceof ViewGroup) {
                                 for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                    if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
-                                        // if this is the layout of the password
-                                        if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
-                                            (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                    if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
+                                        for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
+                                            // if this is the layout of a matching password
+                                            if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
+                                                    ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
+                                                (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                            }
                                         }
                                     }
                                 }
@@ -228,10 +244,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     for (int j = 0; j < password.getChildCount(); j++) {
                         if (password.getChildAt(j) instanceof ViewGroup) {
                             for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
-                                    // if this is the layout of the password
-                                    if (((TextView)(((ViewGroup) password.getChildAt(j)).getChildAt(k))).getText().toString().equals(mPassword)) {
-                                        (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
+                                    for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
+                                        // if this is the layout of a matching password
+                                        if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
+                                                ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
+                                            (password.getChildAt(j)).setBackgroundColor(GREEN);
+                                        }
                                     }
                                 }
                             }
@@ -340,33 +359,44 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
     // decrypt a field
     private String decryptField(String field) {
-        String[] digits = field.split(",");
-        byte[] iv = new byte[IV_LEN],
-                data = new byte[digits.length - IV_LEN];
+        if (field != null && !field.isEmpty()) {
+            String[] digits = field.split(",");
+            byte[] iv = new byte[IV_LEN],
+                    data = new byte[digits.length - IV_LEN];
 
-        for (int i = 0; i < digits.length; i++) {
-            if (i < IV_LEN) {
-                iv[i] = Byte.parseByte(digits[i]);
-            } else {
-                data[i - IV_LEN] = Byte.parseByte(digits[i]);
+            for (int i = 0; i < digits.length; i++) {
+                if (i < IV_LEN) {
+                    iv[i] = Byte.parseByte(digits[i]);
+                } else {
+                    data[i - IV_LEN] = Byte.parseByte(digits[i]);
+                }
             }
+
+            byte[] decoded = null;
+            try {
+                Cipher c = Cipher.getInstance("GCM");
+                SecretKeySpec sks = generateKey(mMasterPassword);
+                GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+                c.init(Cipher.DECRYPT_MODE, sks, gcmParameterSpec);
+                decoded = c.doFinal(data);
+            } catch (Exception e) {
+                Log.e(TAG, "AES decryption error: " + e.getMessage());
+            }
+
+            if (decoded != null)
+                return new String(decoded);
         }
 
-        byte[] decoded = null;
-        try {
-            Cipher c = Cipher.getInstance("GCM");
-            SecretKeySpec sks = generateKey(mMasterPassword);
-            GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
-            c.init(Cipher.DECRYPT_MODE, sks, gcmParameterSpec);
-            decoded = c.doFinal(data);
-        } catch (Exception e) {
-            Log.e(TAG, "AES decryption error: " + e.getMessage());
-        }
+        return " ";
+    }
 
-        if (decoded != null)
-            return new String(decoded);
+    // makes a textview editable
+    private EditText makeEditable(View layoutItemView) {
+        EditText editableItem = new EditText(mContext);
+        editableItem.setText(((TextView) layoutItemView).getText());
+        editableItem.setId(layoutItemView.getId());
 
-        return null;
+        return editableItem;
     }
 
     // enables edit mode
@@ -378,24 +408,15 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 View item = thisPassword.getChildAt(itemPos);
 
                 // if it's not the edit and delete button layout, or the password ID
-                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID) {
+                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID && item.getId() != PASSWORD_LAYOUT && item.getId() != PASSWORD_LABEL_LAYOUT) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
                         View layoutItemView = itemViewGroup.getChildAt(layoutItem);
                         if (layoutItemView.getId() == NAME_TEXT_VIEW ||
                                 layoutItemView.getId() == URL_TEXT_VIEW ||
-                                layoutItemView.getId() == PASSWORD_TEXT_VIEW ||
                                 layoutItemView.getId() == NOTE_TEXT_VIEW) {
-                            // replace with EditText
-                            EditText editableItem = new EditText(mContext);
-                            editableItem.setText(((TextView) layoutItemView).getText());
-                            editableItem.setId(layoutItemView.getId());
+                            itemViewGroup.addView(makeEditable(layoutItemView));
                             itemViewGroup.removeView(layoutItemView); // remove old TextView
-                            if (layoutItemView.getId() == PASSWORD_TEXT_VIEW) {
-                                itemViewGroup.removeViewAt(itemViewGroup.getChildCount() - 1); // remove SHOW button
-                            }
-                            // add new edittext
-                            itemViewGroup.addView(editableItem);
                         }
                     }
                 } else if (item.getId() == EDIT_AND_DELETE_BUTTONS){
@@ -405,6 +426,34 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     itemButton.setText(R.string.done);
 
                     itemButton.setOnClickListener(savePasswordListener);
+                } else if (item.getId() == PASSWORD_LAYOUT) {
+                    // replace TextView with EditText
+                    ViewGroup itemViewGroup = (ViewGroup)item;
+                    for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
+                        View layoutItemViewGroup = itemViewGroup.getChildAt(layoutItem);
+                        if (layoutItemViewGroup.getId() == PASSWORD_TEXT_VIEW) {
+                            // add new edittext
+                            EditText editPass = makeEditable(layoutItemViewGroup);
+                            editPass.setId(R.id.passwordEditText);
+                            itemViewGroup.addView(editPass, 0);
+                            itemViewGroup.removeView(layoutItemViewGroup); // remove old TextView
+                            itemViewGroup.removeViewAt(itemViewGroup.getChildCount() - 1); // remove COPY button
+                            Button genPassBtn = new Button(mContext);
+                            genPassBtn.setId(R.id.generatePasswordBtn);
+                            genPassBtn.setText(R.string.generate);
+                            genPassBtn.setOnClickListener(new Button.OnClickListener(){
+                                @Override
+                                public void onClick(View view) {
+                                    String newPassword = Utils.generatePassword();
+                                    ((EditText)findViewById(R.id.passwordEditText)).setText(newPassword);
+                                }
+                            });
+                            itemViewGroup.addView(genPassBtn);
+                            break;
+                        }
+                    }
+                } else if (item.getId() == PASSWORD_LABEL_LAYOUT) {
+                    ((ViewGroup)item).removeViewAt(((ViewGroup)item).getChildCount() - 1); // remove SHOW button
                 }
             }
         }
@@ -417,18 +466,60 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             String key = "";
 
             // find the key for this password
-            final ViewGroup thisPassword = (ViewGroup)view.getParent();
+            final ViewGroup thisPassword = (ViewGroup)view.getParent().getParent();
             for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
                 View item = thisPassword.getChildAt(itemPos);
 
                 if (item.getId() == PASSWORD_ID) {
                     key = ((TextView)item).getText().toString();
+                    break;
                 }
             }
 
             // take user to confirm delete password activity
             startActivity(ConfirmDeletePasswordActivity.createIntent(mContext, mMasterPassword, key));
             finish();
+        }
+    };
+
+    // copies a password to the clipboard
+    View.OnClickListener copyPasswordListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            // find the key for this password
+            final ViewGroup thisPassword = (ViewGroup)view.getParent();
+            String password = "";
+            for (int itemPos = 0; itemPos < thisPassword.getChildCount(); itemPos++) {
+                View item = thisPassword.getChildAt(itemPos);
+
+                if (item.getId() == PASSWORD_TEXT_VIEW) {
+                    password = ((TextView)item).getText().toString();
+                }
+            }
+            ClipData clip = ClipData.newPlainText("copied_password", password);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(clip);
+            }
+
+            Toast.makeText(mContext, "Password copied.", Toast.LENGTH_LONG).show();
+
+            // clear clipboard after X seconds
+            int numSecondsBeforeClear = getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getInt(NUM_SECONDS_BEFORE_CLIPBOARD_CLEAR, DEFAULT_SECONDS_BEFORE_CLIPBOARD_CLEAR);
+
+            new CountDownTimer(numSecondsBeforeClear * MILLISECONDS_IN_SECOND, MILLISECONDS_IN_SECOND) {
+
+                public void onTick(long millisUntilFinished) {
+                }
+
+                public void onFinish() {
+                    // clear clipboard
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
+                    }
+                    Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
+                }
+            }.start();
         }
     };
 
@@ -441,9 +532,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             for (int i = 0; i < passwordCard.getChildCount(); i++) {
                 if (passwordCard.getChildAt(i) instanceof LinearLayout) {
                     for (int j = 0; j < ((LinearLayout) passwordCard.getChildAt(i)).getChildCount(); j++) {
-                        if (((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j).getId() == PASSWORD_TEXT_VIEW) {
-                            password = ((TextView)(((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j))).getText().toString();
-                            break;
+                        if (((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j).getId() == PASSWORD_LAYOUT) {
+                            for (int k = 0; k < ((LinearLayout)((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j)).getChildCount(); k++) {
+                                if ((((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j)).getId() == PASSWORD_TEXT_VIEW) {
+                                    password = ((TextView)(((LinearLayout)(((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j))).getChildAt(k))).getText().toString();
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -465,7 +560,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             for (int saveItemPos = 0; saveItemPos < thisPassword.getChildCount(); saveItemPos++) {
                 View item = thisPassword.getChildAt(saveItemPos);
 
-                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID) {
+                if (item.getId() != EDIT_AND_DELETE_BUTTONS && item.getId() != PASSWORD_ID && item.getId() != PASSWORD_LAYOUT && item.getId() != PASSWORD_LABEL_LAYOUT) {
                     ViewGroup itemViewGroup = (ViewGroup)item;
 
                     for (int layoutItem = 0; layoutItem < itemViewGroup.getChildCount(); layoutItem++) {
@@ -474,9 +569,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
                         if (layoutItemView.getId() == NAME_TEXT_VIEW ||
                                 layoutItemView.getId() == URL_TEXT_VIEW ||
-                                layoutItemView.getId() == PASSWORD_TEXT_VIEW ||
                                 layoutItemView.getId() == NOTE_TEXT_VIEW) {
-                            EditText editable = (EditText)layoutItemView;
+                            EditText editable = (EditText) layoutItemView;
                             uneditable.setText(editable.getText());
                             uneditable.setId(editable.getId());
                             switch (editable.getId()) {
@@ -487,11 +581,6 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                     newPassword.put("url", encryptField(((EditText) layoutItemView).getText().toString()));
                                     Linkify.addLinks(uneditable, Linkify.WEB_URLS);
                                     break;
-                                case PASSWORD_TEXT_VIEW:
-                                    newPassword.put("password", encryptField(((EditText) layoutItemView).getText().toString()));
-                                    uneditable.setVisibility(View.INVISIBLE);
-                                    uneditable.setTextIsSelectable(true);
-                                    break;
                                 case NOTE_TEXT_VIEW:
                                     newPassword.put("note", encryptField(((EditText) layoutItemView).getText().toString()));
                                     break;
@@ -501,17 +590,47 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                             itemViewGroup.removeView(editable);
                             // add new textview
                             itemViewGroup.addView(uneditable);
-                            if (layoutItemView.getId() == PASSWORD_TEXT_VIEW) {
-                                Button showButton = new Button(mContext);
-                                showButton.setText(R.string.show);
-                                showButton.setOnClickListener(showPasswordListener);
-                                itemViewGroup.addView(showButton); // add SHOW button
-                            }
                         }
                     }
-
                 } else if (item.getId() == PASSWORD_ID) {
                     key = ((TextView)item).getText().toString();
+                } else if (item.getId() == PASSWORD_LAYOUT) {
+                    LinearLayout passwordLayout = (LinearLayout)item;
+                    for (int layoutItem = 0; layoutItem < passwordLayout.getChildCount(); layoutItem++) {
+                        View layoutItemView = passwordLayout.getChildAt(layoutItem);
+
+                        if (layoutItemView.getId() == R.id.passwordEditText) {
+                            newPassword.put("password", encryptField(((EditText) layoutItemView).getText().toString()));
+                            EditText editable = (EditText) layoutItemView;
+                            TextView uneditable = new TextView(mContext);
+
+                            uneditable.setText(editable.getText());
+                            uneditable.setTextSize(PASSWORD_TEXT_SIZE);
+                            uneditable.setId(PASSWORD_TEXT_VIEW);
+                            uneditable.setVisibility(View.INVISIBLE);
+
+                            // remove old edittext
+                            passwordLayout.removeView(editable);
+                            // add new textview
+                            passwordLayout.addView(uneditable, 0);
+
+                            // remove generate button
+                            passwordLayout.removeView(findViewById(R.id.generatePasswordBtn));
+
+                            // add copy button
+                            Button copyButton = new Button(mContext);
+                            copyButton.setText(R.string.copy);
+                            copyButton.setOnClickListener(copyPasswordListener);
+                            passwordLayout.addView(copyButton); // add COPY button
+                            break;
+                        }
+                    }
+                } else if (item.getId() == PASSWORD_LABEL_LAYOUT) {
+                    // add SHOW button
+                    Button showButton = new Button(mContext);
+                    showButton.setText(R.string.show);
+                    showButton.setOnClickListener(showPasswordListener);
+                    ((LinearLayout)item).addView(showButton);
                 }
             }
 
@@ -540,12 +659,17 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         @Override
         public void onClick(View view) {
             // reveal the password
-            ViewGroup passwordLayout = (ViewGroup)view.getParent();
+            ViewGroup passwordLayout = (ViewGroup)view.getParent().getParent();
             for (int itemPos = 0; itemPos < passwordLayout.getChildCount(); itemPos++) {
                 View sibling = passwordLayout.getChildAt(itemPos);
-                if (sibling.getId() == PASSWORD_TEXT_VIEW) {
-                    sibling.setVisibility(View.VISIBLE);
-                    break;
+                if (sibling.getId() == PASSWORD_LAYOUT) {
+                    for (int itemPos2 = 0; itemPos2 < ((ViewGroup)sibling).getChildCount(); itemPos2++) {
+                        View child = ((ViewGroup)sibling).getChildAt(itemPos2);
+                        if (child.getId() == PASSWORD_TEXT_VIEW) {
+                            child.setVisibility(View.VISIBLE);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -670,14 +794,78 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    // check if a password is in the list
+    private SparseArray inList(Password password) {
+        LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
+        boolean inList = false;
+        String urlInList = "", passwordInList = "", noteInList = "", keyInList = "";
+        for (int i = 0; i < passwordsLayout.getChildCount(); i++) {
+            LinearLayout passwordCard = (LinearLayout) passwordsLayout.getChildAt(i);
+            String name = "", url = "", passwordStr = "", note = "", key = "";
+
+            for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
+                View elemView = passwordCard.getChildAt(elem);
+
+                if (elemView instanceof LinearLayout) {
+                    LinearLayout elemViewLayout = (LinearLayout)elemView;
+                    for (int elem2 = 0; elem2 < elemViewLayout.getChildCount(); elem2++) {
+                        View elemView2 = elemViewLayout.getChildAt(elem2);
+
+                        switch (elemView2.getId()) {
+                            case NAME_TEXT_VIEW:
+                                name = ((TextView) elemView2).getText().toString();
+                                break;
+                            case URL_TEXT_VIEW:
+                                url = ((TextView) elemView2).getText().toString();
+                                break;
+                            case PASSWORD_TEXT_VIEW:
+                                passwordStr = ((TextView) elemView2).getText().toString();
+                                break;
+                            case NOTE_TEXT_VIEW:
+                                note = ((TextView) elemView2).getText().toString();
+                                break;
+                        }
+                    }
+                } else if (passwordCard.getChildAt(elem).getId() == PASSWORD_ID) {
+                    key = ((TextView)passwordCard.getChildAt(elem)).getText().toString();
+                }
+            }
+
+            if (name.equalsIgnoreCase(password.name)) {
+                inList = true;
+                urlInList = url;
+                passwordInList = passwordStr;
+                noteInList = note;
+                keyInList = key;
+                break;
+            }
+        }
+        int retVal;
+        if (inList) {
+            if (urlInList.equalsIgnoreCase(password.url) &&
+                    passwordInList.equals(password.password) &&
+                    noteInList.equalsIgnoreCase(password.note)) {
+                retVal = 0; // everything is the same
+            } else {
+                retVal = 1; // name is same, but url, password, and/or note are different
+            }
+        } else {
+            retVal = 2; // the password is not in the list
+        }
+        SparseArray retSparseArray = new SparseArray();
+        retSparseArray.append(retVal, keyInList);
+        return retSparseArray;
+    }
+
     // download passwords from Firestore
-    private void populateList(FirebaseFirestore db, FirebaseUser curUser) {
+    private void populateList(FirebaseFirestore db, FirebaseUser curUser, boolean isClear) {
         final LinearLayout[] passwordsLayout = {findViewById(R.id.passwords_layout)};
         final ViewGroup passwordsLayoutParent = (ViewGroup) passwordsLayout[0].getParent();
         final LinearLayout newPasswordsLayout = new LinearLayout(mContext);
         newPasswordsLayout.setOrientation(LinearLayout.VERTICAL);
         boolean initial = false;
-        if (passwordsLayout[0].getChildCount() == 0) {
+        // if the first password is empty, and it's not a clear list action
+        if (passwordsLayout[0].getChildCount() == 0 && !isClear) {
             initial = true;
         }
 
@@ -733,30 +921,46 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 passwordCard.addView(urlLayout);
 
                                 // password
-                                LinearLayout passwordLayout = new LinearLayout(mContext);
-                                passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                passwordLayout.setMinimumWidth(MATCH_PARENT);
-                                passwordLayout.setMinimumHeight(WRAP_CONTENT);
+                                LinearLayout passwordLabelLayout = new LinearLayout(mContext);
+                                passwordLabelLayout.setId(PASSWORD_LABEL_LAYOUT);
+                                passwordLabelLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                passwordLabelLayout.setMinimumWidth(MATCH_PARENT);
+                                passwordLabelLayout.setMinimumHeight(WRAP_CONTENT);
                                 TextView passwordLabelTextView = new TextView(mContext);
                                 passwordLabelTextView.setText(R.string.password_label);
-                                passwordLayout.addView(passwordLabelTextView);
-                                TextView passwordTextView = new TextView(mContext);
-                                passwordTextView.setText(decryptField(document.getString("password")));
-                                passwordTextView.setId(PASSWORD_TEXT_VIEW);
-                                passwordTextView.setVisibility(View.INVISIBLE);
-                                passwordTextView.setTextIsSelectable(true);
-                                passwordLayout.addView(passwordTextView);
+                                passwordLabelLayout.addView(passwordLabelTextView);
                                 View emptyView = new View(mContext);
                                 emptyView.setMinimumWidth(0);
                                 emptyView.setMinimumHeight(0);
                                 emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
-                                passwordLayout.addView(emptyView);
+                                passwordLabelLayout.addView(emptyView);
                                 Button showPasswordButton = new Button(mContext);
                                 showPasswordButton.setWidth(WRAP_CONTENT);
                                 showPasswordButton.setHeight(WRAP_CONTENT);
                                 showPasswordButton.setText(R.string.show);
                                 showPasswordButton.setOnClickListener(showPasswordListener);
-                                passwordLayout.addView(showPasswordButton);
+                                passwordLabelLayout.addView(showPasswordButton);
+                                passwordCard.addView(passwordLabelLayout);
+                                LinearLayout passwordLayout = new LinearLayout(mContext);
+                                passwordLayout.setId(PASSWORD_LAYOUT);
+                                passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                passwordLayout.setMinimumWidth(MATCH_PARENT);
+                                passwordLayout.setMinimumHeight(WRAP_CONTENT);
+                                TextView passwordTextView = new TextView(mContext);
+                                passwordTextView.setText(decryptField(document.getString("password")));
+                                passwordTextView.setId(PASSWORD_TEXT_VIEW);
+                                passwordTextView.setVisibility(View.INVISIBLE);
+                                passwordTextView.setTextSize(PASSWORD_TEXT_SIZE);
+                                passwordLayout.addView(passwordTextView);
+                                View emptyView2 = new View(mContext);
+                                emptyView2.setMinimumWidth(0);
+                                emptyView2.setMinimumHeight(0);
+                                emptyView2.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                                passwordLayout.addView(emptyView2);
+                                Button copyPasswordButton = new Button(mContext);
+                                copyPasswordButton.setText(R.string.copy);
+                                copyPasswordButton.setOnClickListener(copyPasswordListener);
+                                passwordLayout.addView(copyPasswordButton);
                                 passwordCard.addView(passwordLayout);
 
                                 // note
@@ -768,8 +972,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 TextView noteTextView = new TextView(mContext);
                                 String decryptedNote = decryptField(document.getString("note"));
                                 // if it's not empty, add a newline
-                                if (decryptedNote != null && !decryptedNote.equals(" "))
-                                    decryptedNote += "\n";
+                                /*if (decryptedNote != null && !decryptedNote.equals(" "))
+                                    decryptedNote += "\n";*/
                                 noteTextView.setText(decryptedNote);
                                 noteTextView.setId(NOTE_TEXT_VIEW);
                                 noteLayout.addView(noteTextView);
@@ -791,7 +995,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 deleteButton.setText(R.string.delete);
                                 deleteButton.setOnClickListener(deletePasswordListener);
                                 editDeleteAndCheckButtons.addView(deleteButton);
-
+                                
                                 // if user has enabled pwned passwords, add additional "Check" button
                                 if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
                                     Button checkPwnedButton = new Button(mContext);
@@ -861,8 +1065,16 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                         case URL_TEXT_VIEW:
                                                             newFields.put("url", encryptField(((TextView) elemViewElemView).getText().toString()));
                                                             break;
-                                                        case PASSWORD_TEXT_VIEW:
-                                                            newFields.put("password", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                        case PASSWORD_LAYOUT:
+                                                            for (int elemViewElemViewElem = 0; elemViewElemViewElem < ((LinearLayout) elemViewElemView).getChildCount(); elemViewElemViewElem++) {
+                                                                View elemViewElemViewElemView = ((LinearLayout) elemViewElemView).getChildAt(elemViewElemViewElem);
+
+                                                                switch (elemViewElemViewElemView.getId()) {
+                                                                    case PASSWORD_TEXT_VIEW:
+                                                                        newFields.put("password", encryptField(((TextView) elemViewElemViewElemView).getText().toString()));
+                                                                        break;
+                                                                }
+                                                            }
                                                             break;
                                                         case NOTE_TEXT_VIEW:
                                                             newFields.put("note", encryptField(((TextView) elemViewElemView).getText().toString()));
@@ -896,10 +1108,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 } else if (mImportedPasswords != null && mImportedPasswords.size() > 0) {
                                     // if there are imported passwords,
                                     // delete all of this user's passwords from Firebase
-                                    final int[] numAddedOrDeleted = {0}; // the number of passwords that have been added or deleted
+                                    final int[] numModified = {0}; // the number of passwords that have been added or deleted
                                     loadingPasswordsBar.setVisibility(View.VISIBLE);
-                                    final int numPasswords = passwordsLayout[0].getChildCount();
-                                    if (numPasswords > 0) {
+                                    //final int numPasswords = passwordsLayout[0].getChildCount();
+                                    /*if (numPasswords > 0) {
                                         for (int password = 0; password < numPasswords; password++) {
                                             // get card
                                             LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
@@ -921,9 +1133,9 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                     .addOnSuccessListener(new OnSuccessListener<Void>() {
                                                         @Override
                                                         public void onSuccess(Void aVoid) {
-                                                            numAddedOrDeleted[0]++;
-                                                            if (numAddedOrDeleted[0] == numPasswords) {
-                                                                numAddedOrDeleted[0] = 0; // reset
+                                                            numModified[0]++;
+                                                            if (numModified[0] == numPasswords) {
+                                                                numModified[0] = 0; // reset
 
                                                                 // upload imported passwords
                                                                 for (Password importedPassword : mImportedPasswords) {
@@ -940,8 +1152,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                                                 @Override
                                                                                 public void onSuccess(Void aVoid) {
                                                                                     Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                                                    numAddedOrDeleted[0]++;
-                                                                                    if (numAddedOrDeleted[0] == mImportedPasswords.size()) {
+                                                                                    numModified[0]++;
+                                                                                    if (numModified[0] == mImportedPasswords.size()) {
                                                                                         loadingPasswordsBar.setVisibility(View.GONE);
                                                                                         // refresh list
                                                                                         startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
@@ -966,37 +1178,73 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                 }
                                             });
                                         }
-                                    } else {
+                                    } else */{
                                         // the password list was empty, so there is nothing to delete
                                         // upload imported passwords
                                         for (Password importedPassword : mImportedPasswords) {
-                                            Map<String, Object> newPassword = new HashMap<>();
-                                            newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                                            newPassword.put("name", encryptField(importedPassword.name));
-                                            newPassword.put("url", encryptField(importedPassword.url));
-                                            newPassword.put("password", encryptField(importedPassword.password));
-                                            newPassword.put("note", encryptField(importedPassword.note));
-
-                                            mFirestore.collection("passwords").document()
-                                                    .set(newPassword)
-                                                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                            // if password is not already in list, add it to Firestore
+                                            SparseArray inList = inList(importedPassword);
+                                            switch (inList.keyAt(0)) {
+                                                case 0: // password is already in list, with all fields the same
+                                                    numModified[0]++;
+                                                    if (numModified[0] == mImportedPasswords.size()) {
+                                                        // refresh list
+                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                        finish();
+                                                    }
+                                                    break;
+                                                case 1: // password with this name is already in list, with url, password, and/or note being different
+                                                    Map<String, Object> newFields = new HashMap<>();
+                                                    newFields.put("password", importedPassword.password);
+                                                    newFields.put("note", importedPassword.note);
+                                                    mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
                                                         @Override
                                                         public void onSuccess(Void aVoid) {
-                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                            numAddedOrDeleted[0]++;
-                                                            if (numAddedOrDeleted[0] == mImportedPasswords.size()) {
+                                                            numModified[0]++;
+                                                            if (numModified[0] == mImportedPasswords.size()) {
                                                                 // refresh list
                                                                 startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                                                 finish();
                                                             }
+                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
                                                         }
-                                                    })
-                                                    .addOnFailureListener(new OnFailureListener() {
+                                                    }).addOnFailureListener(new OnFailureListener() {
                                                         @Override
                                                         public void onFailure(@NonNull Exception e) {
                                                             Log.w(TAG, "Error writing document", e);
                                                         }
                                                     });
+                                                    break;
+                                                case 2: // password is entirely new
+                                                    Map<String, Object> newPassword = new HashMap<>();
+                                                    newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                                    newPassword.put("name", encryptField(importedPassword.name));
+                                                    newPassword.put("url", encryptField(importedPassword.url));
+                                                    newPassword.put("password", encryptField(importedPassword.password));
+                                                    newPassword.put("note", encryptField(importedPassword.note));
+
+                                                    mFirestore.collection("passwords").document()
+                                                            .set(newPassword)
+                                                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                                @Override
+                                                                public void onSuccess(Void aVoid) {
+                                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                                    numModified[0]++;
+                                                                    if (numModified[0] == mImportedPasswords.size()) {
+                                                                        // refresh list
+                                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                                        finish();
+                                                                    }
+                                                                }
+                                                            })
+                                                            .addOnFailureListener(new OnFailureListener() {
+                                                                @Override
+                                                                public void onFailure(@NonNull Exception e) {
+                                                                    Log.w(TAG, "Error writing document", e);
+                                                                }
+                                                            });
+                                                    break;
+                                            }
                                         }
                                     }
                                 } else {
@@ -1119,7 +1367,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 invalidateOptionsMenu();
 
                 // re-populate list with every password
-                populateList(FirebaseFirestore.getInstance(), mAuth.getCurrentUser());
+                populateList(FirebaseFirestore.getInstance(), mAuth.getCurrentUser(), true);
                 return false;
             }
         });
@@ -1189,10 +1437,15 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
                                 if (passwordProp instanceof LinearLayout) {
                                     for (int k = 0; k < ((ViewGroup)passwordProp).getChildCount(); k++) {
-                                        if (((ViewGroup)passwordProp).getChildAt(k).getId() == PASSWORD_TEXT_VIEW) {
-                                            String passwordStr = ((TextView)((ViewGroup)passwordProp).getChildAt(k)).getText().toString();
-                                            new PwnedPasswordsDownloaderTask(passwordsLayout).execute(passwordStr);
-                                            break;
+                                        View passwordPropChild = ((ViewGroup)(passwordProp)).getChildAt(k);
+                                        if (passwordPropChild.getId() == PASSWORD_LAYOUT) {
+                                            for (int l = 0; l < ((ViewGroup)passwordPropChild).getChildCount(); l++) {
+                                                if (((ViewGroup)(passwordPropChild)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW) {
+                                                    String passwordStr = ((TextView)(((ViewGroup)(passwordPropChild)).getChildAt(l))).getText().toString();
+                                                    new PwnedPasswordsDownloaderTask(passwordsLayout).execute(passwordStr);
+                                                    break;
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1316,7 +1569,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         FirebaseUser curUser = mAuth.getCurrentUser();
 
         if (curUser != null) {
-            populateList(db, curUser);
+            populateList(db, curUser, false);
 
             // add new password
             FloatingActionButton newPasswordBtn = findViewById(R.id.new_password_btn);

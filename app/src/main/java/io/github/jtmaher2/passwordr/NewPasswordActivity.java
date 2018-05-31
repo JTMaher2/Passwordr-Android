@@ -30,7 +30,6 @@ public class NewPasswordActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TAG = "NewPasswordActivity";
     private static final int IV_LEN = 12;
-    private static final int GEN_PASSWORD_LENGTH = 20;
     private static final int MASTER_PASSWORD_LENGTH = 32;
     private String mMasterPassword;
     private Context mContext;
@@ -102,29 +101,6 @@ public class NewPasswordActivity extends AppCompatActivity {
         }
 
         return encryptedString;
-    }
-
-    // generates a PASSWORD_LEN long password with a certain number of letters, numbers, and symbols
-    private String generatePassword() {
-        String string = "abcdefghijklmnopqrstuvwxyz"; //to upper
-        String numeric = "0123456789";
-        String punctuation = "!@#$%^&*()_+~`|}{[]\\:;?><,./-=";
-        String password = "";
-        String character = "";
-
-        while( password.length()<GEN_PASSWORD_LENGTH ) {
-            double entity1 = Math.ceil(string.length() * Math.random()*Math.random());
-            double entity2 = Math.ceil(numeric.length() * Math.random()*Math.random());
-            double entity3 = Math.ceil(punctuation.length() * Math.random()*Math.random());
-            char hold = string.charAt( (int)entity1 );
-            hold = (entity1%2==0)?(Character.toUpperCase(hold)):(hold);
-            character += hold;
-            character += numeric.charAt( (int)entity2 );
-            character += punctuation.charAt( (int)entity3 );
-            password = character;
-        }
-
-        return password;
     }
 
     @Override
@@ -199,7 +175,7 @@ public class NewPasswordActivity extends AppCompatActivity {
         genPasswordBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                String newPassword = generatePassword();
+                String newPassword = Utils.generatePassword();
                 passwordEditText.setText(newPassword);
                 confirmPasswordEditText.setText(newPassword);
             }

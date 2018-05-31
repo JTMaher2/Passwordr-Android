@@ -150,4 +150,5 @@
     <string name="enable_pwned_npasswords_check">Enable Pwned Passwords Check?</string>
     <string name="do_pwned_passwords_check_on_all_passwords">Check All Passwords</string>
     <string name="check">Check</string>
+    <string name="copy">Copy</string>
 </resources>

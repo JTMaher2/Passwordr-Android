@@ -4,20 +4,51 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.CheckBox;
+import android.widget.EditText;
 
 /**
  * Created by James on 3/21/2018.
  */
 
 public class SettingsActivity extends AppCompatActivity {
+
+    private class addListenerOnTextChange implements TextWatcher {
+        EditText mEdittextview;
+        SharedPreferences mPrefs;
+
+        addListenerOnTextChange(EditText edittextview, SharedPreferences prefs) {
+            super();
+            this.mEdittextview= edittextview;
+            this.mPrefs = prefs;
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+        }
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count,
+                                      int after) {
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+            if (s != null && !s.toString().isEmpty()) {
+                mPrefs.edit().putInt(NUM_SECONDS_BEFORE_CLIPBOARD_CLEAR, Integer.parseInt(s.toString())).apply();
+            }
+        }
+    }
+
     private static final String MY_PREFS_NAME = "PasswordrPreferences";
     private static final String PWNED_PASSWORDS_ENABLED = "PwnedPasswordsEnabled";
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
+    private static final String NUM_SECONDS_BEFORE_CLIPBOARD_CLEAR = "NumSecondsBeforeClipboardClear";
     private String mMasterPassword;
 
     public static Intent createIntent(
@@ -55,6 +86,9 @@ public class SettingsActivity extends AppCompatActivity {
                 prefs.edit().putBoolean(PWNED_PASSWORDS_ENABLED, ((CheckBox)view).isChecked()).apply();
             }
         });
+
+        EditText numSecondsToWaitInput = findViewById(R.id.numSecondsToWaitInput);
+        numSecondsToWaitInput.addTextChangedListener(new addListenerOnTextChange(numSecondsToWaitInput, prefs));
     }
 
     @Override
