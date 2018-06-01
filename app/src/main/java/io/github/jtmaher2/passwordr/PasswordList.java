@@ -186,25 +186,14 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             if (matches != null) {
                 for (String match : matches) {
                     if ((mPassword.substring(0, 5) + match).equals(mPassword)) {
-                        // mark it as pwned
+                        // find any layout that contains this password, and color it red
                         for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
                             ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
-                            // find any layout that contains this password, and color it red
-                            for (int j = 0; j < password.getChildCount(); j++) {
-                                if (password.getChildAt(j) instanceof ViewGroup) {
-                                    for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                        if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
-                                            for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
-                                                // if this is the layout of a matching password
-                                                if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
-                                                        ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
-                                                    (password.getChildAt(j)).setBackgroundColor(RED);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            // if this password is same as password that was checked
+                            if (((TextView)password.findViewById(PASSWORD_TEXT_VIEW)).getText().toString().equals(mPassword)) {
+                                password.setBackgroundColor(RED);
+                                break;
                             }
                         }
                         break;
@@ -214,47 +203,26 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 }
 
                 // if there were no matches
+                // find any layout that contains this password, and color it green
                 if (numNonMatches == matches.size()) {
                     for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
                         ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
-                        // find any layout that contains this password, and color it green
-                        for (int j = 0; j < password.getChildCount(); j++) {
-                            if (password.getChildAt(j) instanceof ViewGroup) {
-                                for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                    if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
-                                        for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
-                                            // if this is the layout of a matching password
-                                            if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
-                                                    ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
-                                                (password.getChildAt(j)).setBackgroundColor(GREEN);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        if (((TextView)password.findViewById(PASSWORD_TEXT_VIEW)).getText().toString().equals(mPassword)) {
+                            password.setBackgroundColor(GREEN);
+                            break;
                         }
                     }
                 }
             } else {
+                // find any layout that contains this password, and color it green
                 for (int i = 0; i < (mPasswordsList.get()).getChildCount(); i++) {
                     ViewGroup password = (ViewGroup) ((mPasswordsList.get()).getChildAt(i));
 
-                    // find any layout that contains this password, and color it green
-                    for (int j = 0; j < password.getChildCount(); j++) {
-                        if (password.getChildAt(j) instanceof ViewGroup) {
-                            for (int k = 0; k < ((ViewGroup) password.getChildAt(j)).getChildCount(); k++) {
-                                if (((ViewGroup) password.getChildAt(j)).getChildAt(k).getId() == PASSWORD_LAYOUT) {
-                                    for (int l = 0; l < ((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildCount(); l++) {
-                                        // if this is the layout of a matching password
-                                        if (((ViewGroup)((ViewGroup)password.getChildAt(j)).getChildAt(k)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW &&
-                                                ((TextView)(((ViewGroup)((ViewGroup) password.getChildAt(j)).getChildAt(k)).getChildAt(l))).getText().toString().equals(mPassword)) {
-                                            (password.getChildAt(j)).setBackgroundColor(GREEN);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    // if this password is same as password that was checked
+                    if (((TextView)password.findViewById(PASSWORD_TEXT_VIEW)).getText().toString().equals(mPassword)) {
+                        password.setBackgroundColor(GREEN);
+                        break;
                     }
                 }
             }
@@ -531,14 +499,12 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             String password = "";
             for (int i = 0; i < passwordCard.getChildCount(); i++) {
                 if (passwordCard.getChildAt(i) instanceof LinearLayout) {
-                    for (int j = 0; j < ((LinearLayout) passwordCard.getChildAt(i)).getChildCount(); j++) {
-                        if (((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j).getId() == PASSWORD_LAYOUT) {
-                            for (int k = 0; k < ((LinearLayout)((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j)).getChildCount(); k++) {
-                                if ((((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j)).getId() == PASSWORD_TEXT_VIEW) {
-                                    password = ((TextView)(((LinearLayout)(((LinearLayout) passwordCard.getChildAt(i)).getChildAt(j))).getChildAt(k))).getText().toString();
-                                    break;
-                                }
-                            }
+                    LinearLayout layout = (LinearLayout)passwordCard.getChildAt(i);
+
+                    for (int j = 0; j < layout.getChildCount(); j++) {
+                        if (layout.getChildAt(j).getId() == PASSWORD_TEXT_VIEW) {
+                            password = ((TextView)layout.getChildAt(j)).getText().toString();
+                            break;
                         }
                     }
                 }
@@ -1431,25 +1397,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                         LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
 
                         for (int i = 0; i < passwordsLayout.getChildCount(); i++) {
-                            ViewGroup password = (ViewGroup)passwordsLayout.getChildAt(i);
-                            for (int j = 0; j < password.getChildCount(); j++) {
-                                View passwordProp = password.getChildAt(j);
-
-                                if (passwordProp instanceof LinearLayout) {
-                                    for (int k = 0; k < ((ViewGroup)passwordProp).getChildCount(); k++) {
-                                        View passwordPropChild = ((ViewGroup)(passwordProp)).getChildAt(k);
-                                        if (passwordPropChild.getId() == PASSWORD_LAYOUT) {
-                                            for (int l = 0; l < ((ViewGroup)passwordPropChild).getChildCount(); l++) {
-                                                if (((ViewGroup)(passwordPropChild)).getChildAt(l).getId() == PASSWORD_TEXT_VIEW) {
-                                                    String passwordStr = ((TextView)(((ViewGroup)(passwordPropChild)).getChildAt(l))).getText().toString();
-                                                    new PwnedPasswordsDownloaderTask(passwordsLayout).execute(passwordStr);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            new PwnedPasswordsDownloaderTask(passwordsLayout).execute(((TextView)(passwordsLayout.getChildAt(i)).findViewById(PASSWORD_TEXT_VIEW)).getText().toString());
                         }
                     }
                 })
