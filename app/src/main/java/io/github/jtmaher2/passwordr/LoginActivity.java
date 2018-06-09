@@ -71,9 +71,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         setContentView(R.layout.activity_login);
 
         mSignInProviders = new ArrayList<>();
-        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build());
-        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build());
-        mSignInProviders.add(new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build());
+        mSignInProviders.add(new AuthUI.IdpConfig.GoogleBuilder().build());
+        mSignInProviders.add(new AuthUI.IdpConfig.FacebookBuilder().build());
+        mSignInProviders.add(new AuthUI.IdpConfig.TwitterBuilder().build());
 
         findViewById(R.id.submit_master_password_btn).setOnClickListener(new OnClickListener() {
             public void onClick(View view) {

@@ -151,4 +151,5 @@
     <string name="do_pwned_passwords_check_on_all_passwords">Check All Passwords</string>
     <string name="check">Check</string>
     <string name="copy">Copy</string>
+    <string name="facebook_application_id" translatable="false">160672534565859</string>
 </resources>

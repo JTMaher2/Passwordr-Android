@@ -87,7 +87,7 @@ import static android.graphics.Color.GREEN;
 import static android.graphics.Color.RED;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
-import static com.firebase.ui.auth.util.ExtraConstants.EXTRA_IDP_RESPONSE;
+import static com.firebase.ui.auth.util.ExtraConstants.IDP_RESPONSE;
 
 public class PasswordList extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final String TAG = "PasswordList";
@@ -272,7 +272,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         Intent startIntent = new Intent();
 
         return startIntent.setClass(context, PasswordList.class)
-                .putExtra(EXTRA_IDP_RESPONSE, idpResponse)
+                .putExtra(IDP_RESPONSE, idpResponse)
                 .putExtra(EXTRA_MASTER_PASSWORD, masterPassword)
                 .putExtra(EXTRA_CHANGED_MASTER_PASSWORD, changedMasterPassword)
                 .putExtra(EXTRA_SIGNED_IN_CONFIG, signedInConfig)
