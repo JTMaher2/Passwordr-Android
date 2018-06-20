@@ -2,6 +2,7 @@ package io.github.jtmaher2.passwordr;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -26,7 +27,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-public class NewPasswordActivity extends AppCompatActivity {
+public class NewPasswordActivity extends AppCompatActivity implements AsyncResponse {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TAG = "NewPasswordActivity";
     private static final int IV_LEN = 12;
@@ -106,6 +107,7 @@ public class NewPasswordActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_new_password);
         Toolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setTitle("New Password");
@@ -178,6 +180,20 @@ public class NewPasswordActivity extends AppCompatActivity {
                 String newPassword = Utils.generatePassword();
                 passwordEditText.setText(newPassword);
                 confirmPasswordEditText.setText(newPassword);
+            }
+        });
+
+        Button checkPasswordBtn = findViewById(R.id.check_password_btn);
+        checkPasswordBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                boolean isPasswordPwned = Utils.checkIsPasswordPwned(passwordEditText.getText().toString());
+
+                if (isPasswordPwned) {
+                    passwordEditText.setBackgroundColor(Color.RED);
+                } else {
+                    passwordEditText.setBackgroundColor(Color.GREEN);
+                }
             }
         });
 
