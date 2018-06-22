@@ -2,6 +2,9 @@ package io.github.jtmaher2.passwordr;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -9,14 +12,24 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,16 +39,129 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import static android.graphics.Color.GREEN;
+import static android.graphics.Color.RED;
+
 public class NewPasswordActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TAG = "NewPasswordActivity";
     private static final int IV_LEN = 12;
     private static final int MASTER_PASSWORD_LENGTH = 32;
+    private static final int PASSWORD_TEXT_VIEW = 44;
+
     private String mMasterPassword;
     private Context mContext;
 
     FirebaseAuth mAuth;
     FirebaseFirestore mFirestore;
+
+    private static class PwnedPasswordsDownloaderTask extends AsyncTask<String, Void, ArrayList<String>> {
+        String mPassword;
+        WeakReference<EditText> mPasswordEditText;
+
+        PwnedPasswordsDownloaderTask(EditText passwordEditText) {
+            mPasswordEditText = new WeakReference<>(passwordEditText);
+        }
+
+        private String byteArrayToHexString(byte[] b) {
+            StringBuilder result = new StringBuilder();
+            for (byte aB : b) {
+                result.append(Integer.toString((aB & 0xff) + 0x100, 16).substring(1));
+            }
+            return result.toString();
+        }
+
+        private String toSHA1(byte[] convertme) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance("SHA-1");
+            }
+            catch(NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            if (md != null) {
+                return byteArrayToHexString(md.digest(convertme));
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        // Actual download method, run in the task thread
+        protected ArrayList<String> doInBackground(String... params) {
+            mPassword = params[0];
+
+            String sha1Password = toSHA1(mPassword.getBytes());
+
+            if (sha1Password != null) {
+                return downloadPwnedPasswordMatches(new Uri.Builder().scheme("https")
+                        .authority("api.pwnedpasswords.com")
+                        .appendPath("range")
+                        .appendPath(sha1Password.substring(0, 5))
+                        .build().toString());
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        // Once the list is downloaded, check each of the hashes to see if it's a match
+        protected void onPostExecute(ArrayList<String> matches) {
+            int numNonMatches = 0;
+
+            if (matches != null) {
+                for (String match : matches) {
+                    if ((mPassword.substring(0, 5) + match).equals(mPassword)) {
+                        mPasswordEditText.get().setBackgroundColor(Color.RED);
+                        break;
+                    } else {
+                        numNonMatches++;
+                    }
+                }
+
+                // if there were no matches
+                // find any layout that contains this password, and color it green
+                if (numNonMatches == matches.size()) {
+                    mPasswordEditText.get().setBackgroundColor(Color.GREEN);
+                }
+            } else {
+                // find any layout that contains this password, and color it green
+                mPasswordEditText.get().setBackgroundColor(Color.GREEN);
+            }
+        }
+
+        private ArrayList<String> downloadPwnedPasswordMatches(String urlStr) {
+            ArrayList<String> matches = new ArrayList<>();
+            StringBuilder sb = new StringBuilder();
+
+            try {
+                URL url = new URL(urlStr);
+                HttpURLConnection con = (HttpURLConnection)url.openConnection();
+                InputStream is = con.getInputStream();
+                int i;
+                boolean inCount = false; // not in the ":XX" segment at end of hash
+                while ((i = is.read()) != -1) {
+                    if (!inCount) {
+                        if ((char) i == ':') {
+                            matches.add(sb.toString());
+                            sb.delete(0, sb.length()); // clear
+                            inCount = true;
+                        } else {
+                            sb.append((char) i);
+                        }
+                    } else { // it is in the ":XX" segment at end of hash
+                        if ((char) i == '\n') {
+                            inCount = false;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage());
+            }
+
+            return matches;
+        }
+    }
 
     public static Intent createIntent(
             Context context,
@@ -178,6 +304,14 @@ public class NewPasswordActivity extends AppCompatActivity {
                 String newPassword = Utils.generatePassword();
                 passwordEditText.setText(newPassword);
                 confirmPasswordEditText.setText(newPassword);
+            }
+        });
+
+        Button checkPasswordBtn = findViewById(R.id.checkPasswordBtn);
+        checkPasswordBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                new PwnedPasswordsDownloaderTask(passwordEditText).execute(passwordEditText.getText().toString());
             }
         });
 
