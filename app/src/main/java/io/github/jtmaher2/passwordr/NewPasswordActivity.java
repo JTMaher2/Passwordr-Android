@@ -12,11 +12,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -39,15 +36,11 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import static android.graphics.Color.GREEN;
-import static android.graphics.Color.RED;
-
 public class NewPasswordActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TAG = "NewPasswordActivity";
     private static final int IV_LEN = 12;
     private static final int MASTER_PASSWORD_LENGTH = 32;
-    private static final int PASSWORD_TEXT_VIEW = 44;
 
     private String mMasterPassword;
     private Context mContext;

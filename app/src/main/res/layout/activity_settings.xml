@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -27,9 +25,10 @@
         android:layout_marginBottom="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="16dp"
-        android:text="Number of Seconds to Wait Before Clearing Clipboard:"
+        android:text="@string/number_of_seconds_to_wait_before_clearing_clipboard"
         android:textColor="@android:color/background_dark"
         android:textSize="24sp"
+        android:labelFor="@+id/numSecondsToWaitInput"
         app:layout_constraintBottom_toTopOf="@+id/enable_pwned_passwords_checkbox"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
