@@ -1,13 +1,10 @@
 package io.github.jtmaher2.passwordr;
 
-import android.widget.TextView;
-
 public class Utils {
-    PwnedPasswordsDownloaderTask pwnedPasswordsDownloaderTask;
     private static final int GEN_PASSWORD_LENGTH = 20;
 
     // generates a PASSWORD_LEN long password with a certain number of letters, numbers, and symbols
-    public String generatePassword() {
+    public static String generatePassword() {
         String string = "abcdefghijklmnopqrstuvwxyz"; //to upper
         String numeric = "0123456789";
         String punctuation = "!@#$%^&*()_+~`|}{[]\\:;?><,./-=";
@@ -27,11 +24,5 @@ public class Utils {
         }
 
         return password;
-    }
-
-    // checks the Pwned Passwords API to see if a password has been pwned
-    public boolean checkIsPasswordPwned(String password) {
-        pwnedPasswordsDownloaderTask.delgate = this;
-        new PwnedPasswordsDownloaderTask(passwordsLayout).execute(password);
     }
 }
