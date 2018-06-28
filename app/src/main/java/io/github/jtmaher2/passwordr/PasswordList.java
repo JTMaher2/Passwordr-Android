@@ -25,7 +25,6 @@ import android.support.v7.widget.Toolbar;
 import android.text.util.Linkify;
 import android.util.Log;
 import android.util.SparseArray;
-import android.util.SparseIntArray;
 import android.util.Xml;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -376,7 +375,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     }
                 }
             }
-            new PwnedPasswordsDownloaderTask((LinearLayout)findViewById(R.id.passwords_layout)).execute(password);
+            new PwnedPasswordsDownloaderTask(findViewById(R.id.passwords_layout)).execute(password);
         }
     };
 

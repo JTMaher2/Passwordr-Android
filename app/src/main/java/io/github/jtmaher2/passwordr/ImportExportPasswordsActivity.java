@@ -4,13 +4,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.JsonReader;
 import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
 import org.w3c.dom.Document;
@@ -36,7 +34,6 @@ import javax.xml.xpath.XPathFactory;
 
 public class ImportExportPasswordsActivity extends AppCompatActivity {
     static final int REQUEST_PASSWORD_IMPORT = 1;
-    private static final String TAG = "ImportExportPasswords";
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_KEEPASS = "text/keepass";

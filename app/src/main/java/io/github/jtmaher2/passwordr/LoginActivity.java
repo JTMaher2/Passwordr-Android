@@ -26,6 +26,7 @@ import android.widget.EditText;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import static android.Manifest.permission.READ_CONTACTS;
@@ -53,11 +54,12 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     /**
      * Keep track of the login task to ensure we can cancel it if requested.
      */
-    private UserLoginTask mAuthTask = null;
+    private static UserLoginTask mAuthTask = null;
 
     // UI references.
-    private View mProgressView;
+    private static WeakReference<View> mProgressView;
     private EditText mMasterPasswordInput;
+    private static int mShortAnimTime;
 
     private ArrayList<AuthUI.IdpConfig> mSignInProviders;
 
@@ -69,6 +71,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+
+        mShortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
 
         mSignInProviders = new ArrayList<>();
         mSignInProviders.add(new AuthUI.IdpConfig.GoogleBuilder().build());
@@ -82,7 +86,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         });
 
         mMasterPasswordInput = findViewById(R.id.master_password_input);
-        mProgressView = findViewById(R.id.login_progress);
+        mProgressView = new WeakReference<>(findViewById(R.id.login_progress));
     }
 
     private void populateAutoComplete() {
@@ -185,18 +189,17 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      * Shows the progress UI and hides the login form.
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
-    private void showProgress(final boolean show) {
+    private static void showProgress(final boolean show) {
         // On Honeycomb MR2 we have the ViewPropertyAnimator APIs, which allow
         // for very easy animations. If available, use these APIs to fade-in
         // the progress spinner.
-        int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
-
-        mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-        mProgressView.animate().setDuration(shortAnimTime).alpha(
+        View progressView = mProgressView.get();
+        progressView.setVisibility(show ? View.VISIBLE : View.GONE);
+        progressView.animate().setDuration(mShortAnimTime).alpha(
                 show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
+                progressView.setVisibility(show ? View.VISIBLE : View.GONE);
             }
         });
     }
@@ -240,7 +243,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      * Represents an asynchronous login/registration task used to authenticate
      * the user.
      */
-    public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
+    public static class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
 
         private final String mEmail;
         private final String mPassword;
@@ -278,9 +281,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             mAuthTask = null;
             showProgress(false);
 
-            if (success) {
+            /*if (success) {
                 finish();
-            }
+            }*/
         }
 
         @Override

@@ -22,10 +22,11 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Enter Master Password"
+        android:text="@string/enter_master_password"
         android:textAlignment="center"
         android:textColor="@android:color/black"
-        android:textSize="30sp" />
+        android:textSize="30sp"
+        android:labelFor="@+id/master_password_input"/>
 
     <EditText
         android:id="@+id/master_password_input"
@@ -40,7 +41,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Submit"
+        android:text="@string/submit"
         android:textStyle="bold" />
 
 </LinearLayout>

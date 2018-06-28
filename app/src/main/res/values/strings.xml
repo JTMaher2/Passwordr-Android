@@ -17,7 +17,7 @@
     <string name="permission_rationale">"Contacts permissions are needed for providing email
         completions."
     </string>
-    <string name="title_activity_password_list">PasswordList</string>
+    <string name="title_activity_password_list">Passwords</string>
     <string name="large_text">
         "Material is the metaphor.\n\n"
 
@@ -126,7 +126,7 @@
     <string name="note">Note:</string>
     <string name="note_without_colon">Note</string>
     <string name="done">DONE</string>
-    <string name="title_activity_new_password">NewPasswordActivity</string>
+    <string name="title_activity_new_password">New Password</string>
     <string name="name">Name</string>
     <string name="url">URL</string>
     <string name="password">Password</string>
@@ -134,13 +134,12 @@
     <string name="generate">Generate</string>
     <string name="passwords">Passwords</string>
     <string name="delete">Delete</string>
-    <string name="title_activity_confirm_delete_password">ConfirmDeletePasswordActivity</string>
+    <string name="title_activity_confirm_delete_password">Delete Password?</string>
     <string name="search">Search</string>
     <string name="clear">Clear</string>
     <string name="change_master_password">Change master password</string>
     <string name="import_export">Import/Export</string>
     <string name="delete_password">Delete password?</string>
-    <string name="cancel">Cancel</string>
     <string name="go">Go</string>
     <string name="xml">XML</string>
     <string name="json">JSON</string>
@@ -152,4 +151,14 @@
     <string name="check">Check</string>
     <string name="copy">Copy</string>
     <string name="facebook_application_id" translatable="false">160672534565859</string>
+    <string name="confirm_nnew_nmaster_npassword">Confirm New Master Password:</string>
+    <string name="new_master_password">new master password</string>
+    <string name="number_of_seconds_to_wait_before_clearing_clipboard">Number of Seconds to Wait Before Clearing Clipboard:</string>
+    <string name="enter_master_password">Enter Master Password</string>
+    <string name="master_password">master password</string>
+    <string name="submit">Submit</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="sort">Sort</string>
+    <string name="keepass_xml">KeePass XML</string>
 </resources>
