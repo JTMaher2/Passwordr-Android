@@ -1382,6 +1382,15 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             }
         });
 
+        MenuItem signOut = menu.findItem(R.id.menu_sign_out);
+        signOut.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                signOutUser();
+                return false;
+            }
+        });
+
         return true;
     }
 
@@ -1407,6 +1416,14 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .show();
+    }
+
+    // sign out user and return to login screen
+    private void signOutUser()
+    {
+        mAuth.signOut();
+        startActivity(LoginActivity.createIntent(mContext));
+        finish();
     }
 
     @Override
@@ -1627,9 +1644,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
     @Override
     public void onBackPressed() {
-        // go back to sign in screen
-        startActivity(LoginActivity.createIntent(mContext));
-        finish();
+        signOutUser();
     }
 
     static final class SignedInConfig implements Parcelable {

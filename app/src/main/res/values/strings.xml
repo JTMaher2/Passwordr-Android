@@ -161,4 +161,5 @@
     <string name="cancel">Cancel</string>
     <string name="sort">Sort</string>
     <string name="keepass_xml">KeePass XML</string>
+    <string name="sign_out">Sign out</string>
 </resources>
