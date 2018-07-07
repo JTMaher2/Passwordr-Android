@@ -78,6 +78,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mSignInProviders.add(new AuthUI.IdpConfig.GoogleBuilder().build());
         mSignInProviders.add(new AuthUI.IdpConfig.FacebookBuilder().build());
         mSignInProviders.add(new AuthUI.IdpConfig.TwitterBuilder().build());
+        mSignInProviders.add(new AuthUI.IdpConfig.GitHubBuilder().build());
 
         findViewById(R.id.submit_master_password_btn).setOnClickListener(new OnClickListener() {
             public void onClick(View view) {
@@ -178,8 +179,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                         .setTheme(AuthUI.getDefaultTheme())
                         .setLogo(AuthUI.NO_LOGO)
                         .setAvailableProviders(mSignInProviders)
-                        .setTosUrl(FIREBASE_TOS_URL)
-                        .setPrivacyPolicyUrl(FIREBASE_PRIVACY_POLICY_URL)
+                        .setTosAndPrivacyPolicyUrls(FIREBASE_TOS_URL, FIREBASE_PRIVACY_POLICY_URL)
                         .setIsSmartLockEnabled(false)
                         .build(),
                 RC_SIGN_IN);
