@@ -6,17 +6,13 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -255,58 +251,39 @@ public class NewPasswordActivity extends AppCompatActivity {
         mMasterPassword = sb.toString();
 
         FloatingActionButton fab = findViewById(R.id.save_new_password_btn);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // encrypt and save password
-                if (passwordEditText.getText().toString().equals(confirmPasswordEditText.getText().toString())) {
-                    Map<String, Object> newPassword = new HashMap<>();
-                    newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                    newPassword.put("name", encryptField(nameEditText.getText().toString()));
-                    newPassword.put("url", encryptField(urlEditText.getText().toString()));
-                    newPassword.put("password", encryptField(passwordEditText.getText().toString()));
-                    newPassword.put("note", encryptField(noteEditText.getText().toString()));
+        fab.setOnClickListener(view -> {
+            // encrypt and save password
+            if (passwordEditText.getText().toString().equals(confirmPasswordEditText.getText().toString())) {
+                Map<String, Object> newPassword = new HashMap<>();
+                newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                newPassword.put("name", encryptField(nameEditText.getText().toString()));
+                newPassword.put("url", encryptField(urlEditText.getText().toString()));
+                newPassword.put("password", encryptField(passwordEditText.getText().toString()));
+                newPassword.put("note", encryptField(noteEditText.getText().toString()));
 
-                    mFirestore.collection("passwords").document()
-                            .set(newPassword)
-                            .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                @Override
-                                public void onSuccess(Void aVoid) {
-                                    Log.d(TAG, "DocumentSnapshot successfully written!");
+                mFirestore.collection("passwords").document()
+                        .set(newPassword)
+                        .addOnSuccessListener(aVoid -> {
+                            Log.d(TAG, "DocumentSnapshot successfully written!");
 
-                                    // go back to list
-                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                    finish();
-                                }
-                            })
-                            .addOnFailureListener(new OnFailureListener() {
-                                @Override
-                                public void onFailure(@NonNull Exception e) {
-                                    Log.w(TAG, "Error writing document", e);
-                                }
-                            });
-                }
-
+                            // go back to list
+                            startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                            finish();
+                        })
+                        .addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
             }
+
         });
 
         Button genPasswordBtn = findViewById(R.id.generatePasswordBtn);
-        genPasswordBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                String newPassword = Utils.generatePassword();
-                passwordEditText.setText(newPassword);
-                confirmPasswordEditText.setText(newPassword);
-            }
+        genPasswordBtn.setOnClickListener(view -> {
+            String newPassword = Utils.generatePassword();
+            passwordEditText.setText(newPassword);
+            confirmPasswordEditText.setText(newPassword);
         });
 
         Button checkPasswordBtn = findViewById(R.id.checkPasswordBtn);
-        checkPasswordBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                new PwnedPasswordsDownloaderTask(passwordEditText).execute(passwordEditText.getText().toString());
-            }
-        });
+        checkPasswordBtn.setOnClickListener(view -> new PwnedPasswordsDownloaderTask(passwordEditText).execute(passwordEditText.getText().toString()));
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

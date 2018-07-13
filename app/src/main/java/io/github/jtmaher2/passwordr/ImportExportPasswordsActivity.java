@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.JsonReader;
 import android.util.Xml;
-import android.view.View;
 import android.widget.Button;
 import android.widget.RadioGroup;
 
@@ -37,7 +36,6 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
     private static final String EXTRA_MASTER_PASSWORD = "extra_master_password";
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_KEEPASS = "text/keepass";
-    private static final String TYPE_CSV = "text/csv";
     private static final String TYPE_JSON = "application/octet-stream";
 
     private static final String ns = null;
@@ -91,34 +89,28 @@ public class ImportExportPasswordsActivity extends AppCompatActivity {
         mMasterPassword = extras == null ? "" : extras.getString(EXTRA_MASTER_PASSWORD);
 
         Button goButton = findViewById(R.id.go_btn);
-        goButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View view) {
-                if (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn) {
-                    mType = TYPE_XML;
-                } else if (xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
-                    mType = TYPE_KEEPASS;
-                } else {
-                    mType = TYPE_JSON;
-                }
+        goButton.setOnClickListener(view -> {
+            if (xmlJson.getCheckedRadioButtonId() == R.id.xmlRadioBtn) {
+                mType = TYPE_XML;
+            } else if (xmlJson.getCheckedRadioButtonId() == R.id.keepassRadioBtn) {
+                mType = TYPE_KEEPASS;
+            } else {
+                mType = TYPE_JSON;
+            }
 
-                if (importExport.getCheckedRadioButtonId() == R.id.importRadioBtn) {
-                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                    if (mType.equals(TYPE_KEEPASS))
-                        intent.setType(TYPE_XML); // type/keepass is not valid, so replace
-                    else
-                        intent.setType(mType); // valid
-                    if (intent.resolveActivity(getPackageManager()) != null) {
-                        startActivityForResult(intent, REQUEST_PASSWORD_IMPORT);
-                    }
-                } else {
-                    // export
-                    if (mType.equals(TYPE_KEEPASS))
-                        mType = TYPE_CSV; // change to CSV
-
-                    startActivity(PasswordList.createIntent(getApplicationContext(), null, mMasterPassword, null, null, null, mType));
-                    finish();
+            if (importExport.getCheckedRadioButtonId() == R.id.importRadioBtn) {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                if (mType.equals(TYPE_KEEPASS))
+                    intent.setType(TYPE_XML); // type/keepass is not valid, so replace
+                else
+                    intent.setType(mType); // valid
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivityForResult(intent, REQUEST_PASSWORD_IMPORT);
                 }
+            } else {
+                // export
+                startActivity(PasswordList.createIntent(getApplicationContext(), null, mMasterPassword, null, null, null, mType));
+                finish();
             }
         });
 

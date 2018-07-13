@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.View;
 import android.widget.Button;
 
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -44,26 +43,20 @@ public class ConfirmDeletePasswordActivity extends AppCompatActivity {
         mKey = extras == null ? "" : extras.getString(EXTRA_PASSWORD_KEY);
         mMasterPassword = extras == null ? "" : extras.getString(EXTRA_MASTER_PASSWORD);
 
-        confirmDeletePasswordBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // delete password from Firebase
-                mFirestore.collection("passwords").document(mKey)
-                        .delete();
+        confirmDeletePasswordBtn.setOnClickListener(view -> {
+            // delete password from Firebase
+            mFirestore.collection("passwords").document(mKey)
+                    .delete();
 
-                // go back to passwords list
-                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                finish();
-            }
+            // go back to passwords list
+            startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+            finish();
         });
 
-        cancelDeletePasswordBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // go back to passwords list
-                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                finish();
-            }
+        cancelDeletePasswordBtn.setOnClickListener(view -> {
+            // go back to passwords list
+            startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+            finish();
         });
 
         if (getSupportActionBar() != null)

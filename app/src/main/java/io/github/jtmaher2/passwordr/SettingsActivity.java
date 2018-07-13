@@ -80,12 +80,7 @@ public class SettingsActivity extends AppCompatActivity {
         CheckBox enablePwnedPasswordsCheckBox = findViewById(R.id.enable_pwned_passwords_checkbox);
 
         enablePwnedPasswordsCheckBox.setChecked(prefs.getBoolean(PWNED_PASSWORDS_ENABLED, false));
-        enablePwnedPasswordsCheckBox.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                prefs.edit().putBoolean(PWNED_PASSWORDS_ENABLED, ((CheckBox)view).isChecked()).apply();
-            }
-        });
+        enablePwnedPasswordsCheckBox.setOnClickListener(view -> prefs.edit().putBoolean(PWNED_PASSWORDS_ENABLED, ((CheckBox)view).isChecked()).apply());
 
         EditText numSecondsToWaitInput = findViewById(R.id.numSecondsToWaitInput);
         numSecondsToWaitInput.addTextChangedListener(new addListenerOnTextChange(numSecondsToWaitInput, prefs));

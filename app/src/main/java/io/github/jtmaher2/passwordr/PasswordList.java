@@ -5,7 +5,6 @@ import android.app.SearchManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -43,16 +42,12 @@ import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -71,7 +66,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,9 +101,12 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final int PASSWORD_ID = 47;
     private static final int PASSWORD_LAYOUT = 48;
     private static final int PASSWORD_LABEL_LAYOUT = 49;
+    private static final int DECRYPT_SUCCESS = 50;
+    private static final int DECRYPT_ERROR = 51;
+    private static final int DECRYPT_NULL = 52;
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_JSON = "application/octet-stream";
-    private static final String TYPE_CSV = "text/csv";
+    private static final String TYPE_KEEPASS = "text/keepass";
 
     private static final int REQUEST_WRITE_STORAGE = 112;
     private ArrayList<Password> mSerializedPasswords;
@@ -127,6 +124,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private String mExportType;
 
     private boolean mFilter = false; // initially, do not display "Clear" option
+    private int mDecryptStatus = DECRYPT_NULL;
+    private ClipboardManager mClipMan;
 
     private static class PwnedPasswordsDownloaderTask extends AsyncTask<String, Void, ArrayList<String>> {
         String mPassword;
@@ -347,13 +346,18 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 c.init(Cipher.DECRYPT_MODE, sks, gcmParameterSpec);
                 decoded = c.doFinal(data);
             } catch (Exception e) {
-                Log.e(TAG, "AES decryption error: " + e.getMessage());
+                Log.e(TAG, e.getMessage());
+                mDecryptStatus = DECRYPT_ERROR;
+                return null;
             }
 
-            if (decoded != null)
+            if (decoded != null) {
+                mDecryptStatus = DECRYPT_SUCCESS;
                 return new String(decoded);
+            }
         }
 
+        mDecryptStatus = DECRYPT_NULL;
         return " ";
     }
 
@@ -408,12 +412,9 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                             Button genPassBtn = new Button(mContext);
                             genPassBtn.setId(R.id.generatePasswordBtn);
                             genPassBtn.setText(R.string.generate);
-                            genPassBtn.setOnClickListener(new Button.OnClickListener(){
-                                @Override
-                                public void onClick(View view) {
-                                    String newPassword = Utils.generatePassword();
-                                    ((EditText)findViewById(R.id.passwordEditText)).setText(newPassword);
-                                }
+                            genPassBtn.setOnClickListener(view1 -> {
+                                String newPassword = Utils.generatePassword();
+                                ((EditText)findViewById(R.id.passwordEditText)).setText(newPassword);
                             });
                             itemViewGroup.addView(genPassBtn);
                             break;
@@ -483,33 +484,30 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     // clear clipboard
                     if (clipboard != null) {
                         clipboard.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
+                        Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
                     }
-                    Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
                 }
             }.start();
         }
     };
 
     // check if password has been pwned
-    View.OnClickListener checkPwnedListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-            LinearLayout passwordCard = (LinearLayout)view.getParent().getParent();
-            String password = "";
-            for (int i = 0; i < passwordCard.getChildCount(); i++) {
-                if (passwordCard.getChildAt(i) instanceof LinearLayout) {
-                    LinearLayout layout = (LinearLayout)passwordCard.getChildAt(i);
+    View.OnClickListener checkPwnedListener = view -> {
+        LinearLayout passwordCard = (LinearLayout)view.getParent().getParent();
+        String password = "";
+        for (int i = 0; i < passwordCard.getChildCount(); i++) {
+            if (passwordCard.getChildAt(i) instanceof LinearLayout) {
+                LinearLayout layout = (LinearLayout)passwordCard.getChildAt(i);
 
-                    for (int j = 0; j < layout.getChildCount(); j++) {
-                        if (layout.getChildAt(j).getId() == PASSWORD_TEXT_VIEW) {
-                            password = ((TextView)layout.getChildAt(j)).getText().toString();
-                            break;
-                        }
+                for (int j = 0; j < layout.getChildCount(); j++) {
+                    if (layout.getChildAt(j).getId() == PASSWORD_TEXT_VIEW) {
+                        password = ((TextView)layout.getChildAt(j)).getText().toString();
+                        break;
                     }
                 }
             }
-            new PwnedPasswordsDownloaderTask(findViewById(R.id.passwords_layout)).execute(password);
         }
+        new PwnedPasswordsDownloaderTask(findViewById(R.id.passwords_layout)).execute(password);
     };
 
     // applies changes to Firebase
@@ -602,38 +600,25 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             // overwrite existing password
             mFirestore.collection("passwords").document(key)
                     .set(newPassword)
-                    .addOnSuccessListener(new OnSuccessListener<Void>() {
-                        @Override
-                        public void onSuccess(Void aVoid) {
-                            Log.d(TAG, "DocumentSnapshot successfully written!");
-                        }
-                    })
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            Log.w(TAG, "Error writing document", e);
-                        }
-                    });
+                    .addOnSuccessListener(aVoid -> Log.d(TAG, "DocumentSnapshot successfully written!"))
+                    .addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
 
             ((Button)view).setText(R.string.edit); // change text back to normal
             view.setOnClickListener(editPasswordListener); // revert listener to normal
         }
     };
 
-    View.OnClickListener showPasswordListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-            // reveal the password
-            ViewGroup passwordLayout = (ViewGroup)view.getParent().getParent();
-            for (int itemPos = 0; itemPos < passwordLayout.getChildCount(); itemPos++) {
-                View sibling = passwordLayout.getChildAt(itemPos);
-                if (sibling.getId() == PASSWORD_LAYOUT) {
-                    for (int itemPos2 = 0; itemPos2 < ((ViewGroup)sibling).getChildCount(); itemPos2++) {
-                        View child = ((ViewGroup)sibling).getChildAt(itemPos2);
-                        if (child.getId() == PASSWORD_TEXT_VIEW) {
-                            child.setVisibility(View.VISIBLE);
-                            break;
-                        }
+    View.OnClickListener showPasswordListener = view -> {
+        // reveal the password
+        ViewGroup passwordLayout = (ViewGroup)view.getParent().getParent();
+        for (int itemPos = 0; itemPos < passwordLayout.getChildCount(); itemPos++) {
+            View sibling = passwordLayout.getChildAt(itemPos);
+            if (sibling.getId() == PASSWORD_LAYOUT) {
+                for (int itemPos2 = 0; itemPos2 < ((ViewGroup)sibling).getChildCount(); itemPos2++) {
+                    View child = ((ViewGroup)sibling).getChildAt(itemPos2);
+                    if (child.getId() == PASSWORD_TEXT_VIEW) {
+                        child.setVisibility(View.VISIBLE);
+                        break;
                     }
                 }
             }
@@ -644,45 +629,48 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private void writeJSONFile() {
         JSONObject passwordsJSON = new JSONObject();
         try {
-            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS), "passwords.json"));
+            File externStoragePubDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            FileOutputStream fileos = new FileOutputStream(new File(externStoragePubDir, "passwords.json"));
 
             for (int p = 0; p < mSerializedPasswords.size(); p++) {
                 JSONObject passwordJSON = new JSONObject();
-
-                passwordJSON.put("name", mSerializedPasswords.get(p).name);
-                passwordJSON.put("url", mSerializedPasswords.get(p).url);
-                passwordJSON.put("password_str", mSerializedPasswords.get(p).password);
-                passwordJSON.put("note", mSerializedPasswords.get(p).note);
+                Password curPass = mSerializedPasswords.get(p);
+                passwordJSON.put("name", curPass.name);
+                passwordJSON.put("url", curPass.url);
+                passwordJSON.put("password_str", curPass.password);
+                passwordJSON.put("note", curPass.note);
 
                 passwordsJSON.put("password-" + p, passwordJSON);
             }
             // get rid of the backslashes that the .put method automatically prepends to forward slashes
             fileos.write(new JSONObject().put("passwords", passwordsJSON).toString().replace("\\/", "/").getBytes());
             fileos.close();
+            Toast.makeText(mContext, "Passwords have been exported to " + externStoragePubDir.getPath() + "/passwords.json", Toast.LENGTH_LONG).show();
         } catch (IOException | JSONException e) {
             e.printStackTrace();
         }
     }
 
-    // convert password list to CSV file, and save to disk
-    private void writeCSVFile() {
+    // convert password list to CSV file with escaped double quotes, and save to disk
+    private void writeKeePassCSVFile() {
         StringBuilder output = new StringBuilder();
 
         output.append("title, url, password, note\n");
 
         try {
-            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS), "passwords.csv"));
+            File externStoragePubDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            FileOutputStream fileos = new FileOutputStream(new File(externStoragePubDir, "passwords.csv"));
 
             for (int p = 0; p < mSerializedPasswords.size(); p++) {
-                output.append(mSerializedPasswords.get(p).name.replace('\n', ' ')).append(',')
-                        .append(mSerializedPasswords.get(p).url.replace('\n', ' ')).append(',')
-                        .append(mSerializedPasswords.get(p).password.replace('\n', ' ')).append(',')
-                        .append(mSerializedPasswords.get(p).note.replace('\n', ' ')).append('\n');
+                Password curPass = mSerializedPasswords.get(p);
+                output.append(curPass.name.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.url.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.password.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.note.replace('\n', ' ').replace("\"", "\\\"")).append('\n');
             }
             fileos.write(output.toString().getBytes());
             fileos.close();
+            Toast.makeText(mContext, "Passwords have been exported to " + externStoragePubDir.getPath() + "/passwords.csv", Toast.LENGTH_LONG).show();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -703,9 +691,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                         case TYPE_JSON:
                             writeJSONFile();
                             break;
-                        case TYPE_CSV:
-                            writeCSVFile();
-                            break;
+                        case TYPE_KEEPASS:
+                            writeKeePassCSVFile();
                     }
                 } else
                 {
@@ -719,8 +706,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     // convert password list to XML file, and save to disk
     private void writeXMLFile() {
         try {
-            FileOutputStream fileos = new FileOutputStream(new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS), "passwords.xml"));
+            File externStoragePubDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            FileOutputStream fileos = new FileOutputStream(new File(externStoragePubDir, "passwords.xml"));
             XmlSerializer xmlSerializer = Xml.newSerializer();
             StringWriter writer = new StringWriter();
             xmlSerializer.setOutput(writer);
@@ -753,6 +740,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             String dataWrite = writer.toString();
             fileos.write(dataWrite.getBytes());
             fileos.close();
+            Toast.makeText(mContext, "Passwords have been exported to " + externStoragePubDir.getPath() + "/passwords.xml", Toast.LENGTH_LONG).show();
         }
         catch (IllegalArgumentException | IllegalStateException | IOException e) {
             Log.e(TAG, Arrays.toString(e.getStackTrace()));
@@ -852,457 +840,482 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         db.collection("passwords")
                 .whereEqualTo("userid", curUser.getUid())
                 .get()
-                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                    @Override
-                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            for (DocumentSnapshot document : task.getResult()) {
-                                LinearLayout passwordCard = new LinearLayout(mContext);
-                                passwordCard.setOrientation(LinearLayout.VERTICAL);
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        loop: for (DocumentSnapshot document : task.getResult()) {
+                            LinearLayout passwordCard = new LinearLayout(mContext);
+                            passwordCard.setOrientation(LinearLayout.VERTICAL);
 
-                                // name
-                                LinearLayout nameLayout = new LinearLayout(mContext);
-                                nameLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                TextView nameLabelTextView = new TextView(mContext);
-                                nameLabelTextView.setText(R.string.name_label);
-                                nameLayout.addView(nameLabelTextView);
-                                TextView nameTextView = new TextView(mContext);
-                                nameTextView.setText(decryptField(document.getString("name")));
-                                nameTextView.setId(NAME_TEXT_VIEW);
-                                nameLayout.addView(nameTextView);
-                                passwordCard.addView(nameLayout);
+                            // name
+                            LinearLayout nameLayout = new LinearLayout(mContext);
+                            nameLayout.setOrientation(LinearLayout.HORIZONTAL);
+                            TextView nameLabelTextView = new TextView(mContext);
+                            nameLabelTextView.setText(R.string.name_label);
+                            nameLayout.addView(nameLabelTextView);
+                            TextView nameTextView = new TextView(mContext);
+                            String decryptedName = decryptField(document.getString("name"));
+                            switch (mDecryptStatus) {
+                                case DECRYPT_SUCCESS:
+                                case DECRYPT_NULL:
+                                    nameTextView.setText(decryptedName);
+                                    break;
+                                case DECRYPT_ERROR:
+                                    // wrong password, so take user back to login activity
+                                    startActivity(LoginActivity.createIntent(mContext));
+                                    finish();
+                                    break loop;
+                            }
+                            nameTextView.setId(NAME_TEXT_VIEW);
+                            nameLayout.addView(nameTextView);
+                            passwordCard.addView(nameLayout);
 
-                                // url
-                                LinearLayout urlLayout = new LinearLayout(mContext);
-                                urlLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                TextView urlLabelTextView = new TextView(mContext);
-                                urlLabelTextView.setText(R.string.url_label);
-                                urlLayout.addView(urlLabelTextView);
-                                TextView urlTextView = new TextView(mContext);
-                                urlTextView.setText(decryptField(document.getString("url")));
-                                urlTextView.setId(URL_TEXT_VIEW);
-                                Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
-                                urlLayout.addView(urlTextView);
-                                passwordCard.addView(urlLayout);
+                            // url
+                            LinearLayout urlLayout = new LinearLayout(mContext);
+                            urlLayout.setOrientation(LinearLayout.HORIZONTAL);
+                            TextView urlLabelTextView = new TextView(mContext);
+                            urlLabelTextView.setText(R.string.url_label);
+                            urlLayout.addView(urlLabelTextView);
+                            TextView urlTextView = new TextView(mContext);
+                            String decryptedUrl = decryptField(document.getString("url"));
+                            switch (mDecryptStatus)
+                            {
+                                case DECRYPT_SUCCESS:
+                                case DECRYPT_NULL:
+                                    urlTextView.setText(decryptedUrl);
+                                    break;
+                                case DECRYPT_ERROR:
+                                    // wrong password, so take user back to login activity
+                                    startActivity(LoginActivity.createIntent(mContext));
+                                    finish();
+                                    break loop;
+                            }
+                            urlTextView.setId(URL_TEXT_VIEW);
+                            Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
+                            urlLayout.addView(urlTextView);
+                            passwordCard.addView(urlLayout);
 
-                                // password
-                                LinearLayout passwordLabelLayout = new LinearLayout(mContext);
-                                passwordLabelLayout.setId(PASSWORD_LABEL_LAYOUT);
-                                passwordLabelLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                passwordLabelLayout.setMinimumWidth(MATCH_PARENT);
-                                passwordLabelLayout.setMinimumHeight(WRAP_CONTENT);
-                                TextView passwordLabelTextView = new TextView(mContext);
-                                passwordLabelTextView.setText(R.string.password_label);
-                                passwordLabelLayout.addView(passwordLabelTextView);
-                                View emptyView = new View(mContext);
-                                emptyView.setMinimumWidth(0);
-                                emptyView.setMinimumHeight(0);
-                                emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
-                                passwordLabelLayout.addView(emptyView);
-                                Button showPasswordButton = new Button(mContext);
-                                showPasswordButton.setWidth(WRAP_CONTENT);
-                                showPasswordButton.setHeight(WRAP_CONTENT);
-                                showPasswordButton.setText(R.string.show);
-                                showPasswordButton.setOnClickListener(showPasswordListener);
-                                passwordLabelLayout.addView(showPasswordButton);
-                                passwordCard.addView(passwordLabelLayout);
-                                LinearLayout passwordLayout = new LinearLayout(mContext);
-                                passwordLayout.setId(PASSWORD_LAYOUT);
-                                passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                passwordLayout.setMinimumWidth(MATCH_PARENT);
-                                passwordLayout.setMinimumHeight(WRAP_CONTENT);
-                                TextView passwordTextView = new TextView(mContext);
-                                passwordTextView.setText(decryptField(document.getString("password")));
-                                passwordTextView.setId(PASSWORD_TEXT_VIEW);
-                                passwordTextView.setVisibility(View.INVISIBLE);
-                                passwordTextView.setTextSize(PASSWORD_TEXT_SIZE);
-                                passwordLayout.addView(passwordTextView);
-                                View emptyView2 = new View(mContext);
-                                emptyView2.setMinimumWidth(0);
-                                emptyView2.setMinimumHeight(0);
-                                emptyView2.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
-                                passwordLayout.addView(emptyView2);
-                                Button copyPasswordButton = new Button(mContext);
-                                copyPasswordButton.setText(R.string.copy);
-                                copyPasswordButton.setOnClickListener(copyPasswordListener);
-                                passwordLayout.addView(copyPasswordButton);
-                                passwordCard.addView(passwordLayout);
+                            // password
+                            LinearLayout passwordLabelLayout = new LinearLayout(mContext);
+                            passwordLabelLayout.setId(PASSWORD_LABEL_LAYOUT);
+                            passwordLabelLayout.setOrientation(LinearLayout.HORIZONTAL);
+                            passwordLabelLayout.setMinimumWidth(MATCH_PARENT);
+                            passwordLabelLayout.setMinimumHeight(WRAP_CONTENT);
+                            TextView passwordLabelTextView = new TextView(mContext);
+                            passwordLabelTextView.setText(R.string.password_label);
+                            passwordLabelLayout.addView(passwordLabelTextView);
+                            View emptyView = new View(mContext);
+                            emptyView.setMinimumWidth(0);
+                            emptyView.setMinimumHeight(0);
+                            emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                            passwordLabelLayout.addView(emptyView);
+                            Button showPasswordButton = new Button(mContext);
+                            showPasswordButton.setWidth(WRAP_CONTENT);
+                            showPasswordButton.setHeight(WRAP_CONTENT);
+                            showPasswordButton.setText(R.string.show);
+                            showPasswordButton.setOnClickListener(showPasswordListener);
+                            passwordLabelLayout.addView(showPasswordButton);
+                            passwordCard.addView(passwordLabelLayout);
+                            LinearLayout passwordLayout = new LinearLayout(mContext);
+                            passwordLayout.setId(PASSWORD_LAYOUT);
+                            passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
+                            passwordLayout.setMinimumWidth(MATCH_PARENT);
+                            passwordLayout.setMinimumHeight(WRAP_CONTENT);
+                            TextView passwordTextView = new TextView(mContext);
+                            String decryptedPassword = decryptField(document.getString("password"));
+                            switch (mDecryptStatus)
+                            {
+                                case DECRYPT_SUCCESS:
+                                case DECRYPT_NULL:
+                                    passwordTextView.setText(decryptedPassword);
+                                    break;
+                                case DECRYPT_ERROR:
+                                    // wrong password, so take user back to login activity
+                                    startActivity(LoginActivity.createIntent(mContext));
+                                    finish();
+                                    break loop;
+                            }
+                            passwordTextView.setId(PASSWORD_TEXT_VIEW);
+                            passwordTextView.setVisibility(View.INVISIBLE);
+                            passwordTextView.setTextSize(PASSWORD_TEXT_SIZE);
+                            passwordLayout.addView(passwordTextView);
+                            View emptyView2 = new View(mContext);
+                            emptyView2.setMinimumWidth(0);
+                            emptyView2.setMinimumHeight(0);
+                            emptyView2.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                            passwordLayout.addView(emptyView2);
+                            Button copyPasswordButton = new Button(mContext);
+                            copyPasswordButton.setText(R.string.copy);
+                            copyPasswordButton.setOnClickListener(copyPasswordListener);
+                            passwordLayout.addView(copyPasswordButton);
+                            passwordCard.addView(passwordLayout);
 
-                                // note
-                                LinearLayout noteLayout = new LinearLayout(mContext);
-                                noteLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                TextView noteLabelTextView = new TextView(mContext);
-                                noteLabelTextView.setText(R.string.note);
-                                noteLayout.addView(noteLabelTextView);
-                                TextView noteTextView = new TextView(mContext);
-                                String decryptedNote = decryptField(document.getString("note"));
-                                // if it's not empty, add a newline
-                                /*if (decryptedNote != null && !decryptedNote.equals(" "))
-                                    decryptedNote += "\n";*/
-                                noteTextView.setText(decryptedNote);
-                                noteTextView.setId(NOTE_TEXT_VIEW);
-                                noteLayout.addView(noteTextView);
-                                passwordCard.addView(noteLayout);
+                            // note
+                            LinearLayout noteLayout = new LinearLayout(mContext);
+                            noteLayout.setOrientation(LinearLayout.HORIZONTAL);
+                            TextView noteLabelTextView = new TextView(mContext);
+                            noteLabelTextView.setText(R.string.note);
+                            noteLayout.addView(noteLabelTextView);
+                            TextView noteTextView = new TextView(mContext);
+                            String decryptedNote = decryptField(document.getString("note"));
+                            // if it's not empty, add a newline
+                            /*if (decryptedNote != null && !decryptedNote.equals(" "))
+                                decryptedNote += "\n";*/
+                            switch (mDecryptStatus)
+                            {
+                                case DECRYPT_SUCCESS:
+                                case DECRYPT_NULL:
+                                    noteTextView.setText(decryptedNote);
+                                    break;
+                                case DECRYPT_ERROR:
+                                    // wrong password, so take user back to login activity
+                                    startActivity(LoginActivity.createIntent(mContext));
+                                    finish();
+                                    break loop;
+                            }
+                            noteTextView.setId(NOTE_TEXT_VIEW);
+                            noteLayout.addView(noteTextView);
+                            passwordCard.addView(noteLayout);
 
-                                // Edit & Delete button layout
-                                LinearLayout editDeleteAndCheckButtons = new LinearLayout(mContext);
-                                editDeleteAndCheckButtons.setId(EDIT_AND_DELETE_BUTTONS);
-                                editDeleteAndCheckButtons.setOrientation(LinearLayout.HORIZONTAL);
+                            // Edit & Delete button layout
+                            LinearLayout editDeleteAndCheckButtons = new LinearLayout(mContext);
+                            editDeleteAndCheckButtons.setId(EDIT_AND_DELETE_BUTTONS);
+                            editDeleteAndCheckButtons.setOrientation(LinearLayout.HORIZONTAL);
 
-                                // Edit button
-                                Button editButton = new Button(mContext);
-                                editButton.setText(R.string.edit);
-                                editButton.setOnClickListener(editPasswordListener);
-                                editDeleteAndCheckButtons.addView(editButton);
+                            // Edit button
+                            Button editButton = new Button(mContext);
+                            editButton.setText(R.string.edit);
+                            editButton.setOnClickListener(editPasswordListener);
+                            editDeleteAndCheckButtons.addView(editButton);
 
-                                // Delete button
-                                Button deleteButton = new Button(mContext);
-                                deleteButton.setText(R.string.delete);
-                                deleteButton.setOnClickListener(deletePasswordListener);
-                                editDeleteAndCheckButtons.addView(deleteButton);
+                            // Delete button
+                            Button deleteButton = new Button(mContext);
+                            deleteButton.setText(R.string.delete);
+                            deleteButton.setOnClickListener(deletePasswordListener);
+                            editDeleteAndCheckButtons.addView(deleteButton);
 
-                                // if user has enabled pwned passwords, add additional "Check" button
-                                if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
-                                    Button checkPwnedButton = new Button(mContext);
-                                    checkPwnedButton.setText(R.string.check);
-                                    checkPwnedButton.setOnClickListener(checkPwnedListener);
-                                    editDeleteAndCheckButtons.addView(checkPwnedButton);
-                                }
-
-                                passwordCard.addView(editDeleteAndCheckButtons);
-
-                                // Password ID
-                                TextView passwordID = new TextView(mContext);
-                                passwordID.setText(document.getId());
-                                passwordID.setVisibility(View.INVISIBLE);
-                                passwordID.setId(PASSWORD_ID);
-                                passwordCard.addView(passwordID);
-
-                                if (finalInitial) {
-                                    passwordsLayout[0].addView(passwordCard);
-                                } else {
-                                    newPasswordsLayout.addView(passwordCard);
-                                }
+                            // if user has enabled pwned passwords, add additional "Check" button
+                            if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
+                                Button checkPwnedButton = new Button(mContext);
+                                checkPwnedButton.setText(R.string.check);
+                                checkPwnedButton.setOnClickListener(checkPwnedListener);
+                                editDeleteAndCheckButtons.addView(checkPwnedButton);
                             }
 
-                            // if it's initial update
+                            passwordCard.addView(editDeleteAndCheckButtons);
+
+                            // Password ID
+                            TextView passwordID = new TextView(mContext);
+                            passwordID.setText(document.getId());
+                            passwordID.setVisibility(View.INVISIBLE);
+                            passwordID.setId(PASSWORD_ID);
+                            passwordCard.addView(passwordID);
+
                             if (finalInitial) {
+                                passwordsLayout[0].addView(passwordCard);
+                            } else {
+                                newPasswordsLayout.addView(passwordCard);
+                            }
+                        }
 
-                                /*if (mExportType != null) {
-                                    switch (mExportType) {
-                                        case TYPE_XML:
-                                            writeXMLFile();
-                                            break;
-                                        case TYPE_JSON:
-                                            writeJSONFile();
-                                            break;
-                                    }
+                        // if it's initial update
+                        if (finalInitial) {
+
+                            /*if (mExportType != null) {
+                                switch (mExportType) {
+                                    case TYPE_XML:
+                                        writeXMLFile();
+                                        break;
+                                    case TYPE_JSON:
+                                        writeJSONFile();
+                                        break;
                                 }
-                                // if user wants to change the master password
-                                else*/ if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
-                                    mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
+                            }
+                            // if user wants to change the master password
+                            else*/ if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
+                                mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
 
-                                    final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
-                                    loadingPasswordsBar.setVisibility(View.VISIBLE);
+                                final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
+                                loadingPasswordsBar.setVisibility(View.VISIBLE);
 
-                                    // re-encrypt everything using new master password
-                                    for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
+                                // re-encrypt everything using new master password
+                                for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
+                                    // get card
+                                    LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
+
+                                    String key = "";
+                                    Map<String, Object> newFields = new HashMap<>();
+                                    newFields.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+
+                                    // get key, name, url, password, and note
+                                    for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
+                                        View elemView = passwordCard.getChildAt(elem);
+
+                                        // encrypt using new master password
+                                        if (elemView instanceof LinearLayout) {
+                                            for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
+                                                View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
+
+                                                switch (elemViewElemView.getId()) {
+                                                    case NAME_TEXT_VIEW:
+                                                        newFields.put("name", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                        break;
+                                                    case URL_TEXT_VIEW:
+                                                        newFields.put("url", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                        break;
+                                                    case PASSWORD_LAYOUT:
+                                                        for (int elemViewElemViewElem = 0; elemViewElemViewElem < ((LinearLayout) elemViewElemView).getChildCount(); elemViewElemViewElem++) {
+                                                            View elemViewElemViewElemView = ((LinearLayout) elemViewElemView).getChildAt(elemViewElemViewElem);
+
+                                                            switch (elemViewElemViewElemView.getId()) {
+                                                                case PASSWORD_TEXT_VIEW:
+                                                                    newFields.put("password", encryptField(((TextView) elemViewElemViewElemView).getText().toString()));
+                                                                    break;
+                                                            }
+                                                        }
+                                                        break;
+                                                    case NOTE_TEXT_VIEW:
+                                                        newFields.put("note", encryptField(((TextView) elemViewElemView).getText().toString()));
+                                                        break;
+                                                }
+                                            }
+                                        } else if (elemView.getId() == PASSWORD_ID) {
+                                            key = ((TextView) elemView).getText().toString();
+                                        }
+                                    }
+
+                                    // upload to firebase
+                                    mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
+                                        @Override
+                                        public void onSuccess(Void aVoid) {
+                                            numEncrypted[0]++;
+                                            if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
+                                                loadingPasswordsBar.setVisibility(View.GONE);
+                                                // sort A-Z
+                                                onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
+                                            }
+                                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                                        }
+                                    }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                }
+                            } else if (mImportedPasswords != null && mImportedPasswords.size() > 0) {
+                                // if there are imported passwords,
+                                // delete all of this user's passwords from Firebase
+                                final int[] numModified = {0}; // the number of passwords that have been added or deleted
+                                loadingPasswordsBar.setVisibility(View.VISIBLE);
+                                //final int numPasswords = passwordsLayout[0].getChildCount();
+                                /*if (numPasswords > 0) {
+                                    for (int password = 0; password < numPasswords; password++) {
                                         // get card
                                         LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
 
                                         String key = "";
-                                        Map<String, Object> newFields = new HashMap<>();
-                                        newFields.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
 
-                                        // get key, name, url, password, and note
+                                        // get key of each password
                                         for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
                                             View elemView = passwordCard.getChildAt(elem);
 
-                                            // encrypt using new master password
-                                            if (elemView instanceof LinearLayout) {
-                                                for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
-                                                    View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
-
-                                                    switch (elemViewElemView.getId()) {
-                                                        case NAME_TEXT_VIEW:
-                                                            newFields.put("name", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                            break;
-                                                        case URL_TEXT_VIEW:
-                                                            newFields.put("url", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                            break;
-                                                        case PASSWORD_LAYOUT:
-                                                            for (int elemViewElemViewElem = 0; elemViewElemViewElem < ((LinearLayout) elemViewElemView).getChildCount(); elemViewElemViewElem++) {
-                                                                View elemViewElemViewElemView = ((LinearLayout) elemViewElemView).getChildAt(elemViewElemViewElem);
-
-                                                                switch (elemViewElemViewElemView.getId()) {
-                                                                    case PASSWORD_TEXT_VIEW:
-                                                                        newFields.put("password", encryptField(((TextView) elemViewElemViewElemView).getText().toString()));
-                                                                        break;
-                                                                }
-                                                            }
-                                                            break;
-                                                        case NOTE_TEXT_VIEW:
-                                                            newFields.put("note", encryptField(((TextView) elemViewElemView).getText().toString()));
-                                                            break;
-                                                    }
-                                                }
-                                            } else if (elemView.getId() == PASSWORD_ID) {
+                                            if (elemView.getId() == PASSWORD_ID) {
                                                 key = ((TextView) elemView).getText().toString();
+                                                break;
                                             }
                                         }
 
-                                        // upload to firebase
-                                        mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
-                                            @Override
-                                            public void onSuccess(Void aVoid) {
-                                                numEncrypted[0]++;
-                                                if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
-                                                    loadingPasswordsBar.setVisibility(View.GONE);
-                                                    // sort A-Z
-                                                    onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
-                                                }
-                                                Log.d(TAG, "DocumentSnapshot successfully written!");
-                                            }
-                                        }).addOnFailureListener(new OnFailureListener() {
+                                        // delete
+                                        mFirestore.collection("passwords").document(key).delete()
+                                                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                    @Override
+                                                    public void onSuccess(Void aVoid) {
+                                                        numModified[0]++;
+                                                        if (numModified[0] == numPasswords) {
+                                                            numModified[0] = 0; // reset
+
+                                                            // upload imported passwords
+                                                            for (Password importedPassword : mImportedPasswords) {
+                                                                Map<String, Object> newPassword = new HashMap<>();
+                                                                newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                                                newPassword.put("name", encryptField(importedPassword.name));
+                                                                newPassword.put("url", encryptField(importedPassword.url));
+                                                                newPassword.put("password", encryptField(importedPassword.password));
+                                                                newPassword.put("note", encryptField(importedPassword.note));
+
+                                                                mFirestore.collection("passwords").document()
+                                                                        .set(newPassword)
+                                                                        .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                                            @Override
+                                                                            public void onSuccess(Void aVoid) {
+                                                                                Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                                                numModified[0]++;
+                                                                                if (numModified[0] == mImportedPasswords.size()) {
+                                                                                    loadingPasswordsBar.setVisibility(View.GONE);
+                                                                                    // refresh list
+                                                                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                                                    finish();
+                                                                                }
+                                                                            }
+                                                                        })
+                                                                        .addOnFailureListener(new OnFailureListener() {
+                                                                            @Override
+                                                                            public void onFailure(@NonNull Exception e) {
+                                                                                Log.w(TAG, "Error writing document", e);
+                                                                            }
+                                                                        });
+                                                            }
+                                                        }
+                                                        Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                    }
+                                                }).addOnFailureListener(new OnFailureListener() {
                                             @Override
                                             public void onFailure(@NonNull Exception e) {
                                                 Log.w(TAG, "Error writing document", e);
                                             }
                                         });
                                     }
-                                } else if (mImportedPasswords != null && mImportedPasswords.size() > 0) {
-                                    // if there are imported passwords,
-                                    // delete all of this user's passwords from Firebase
-                                    final int[] numModified = {0}; // the number of passwords that have been added or deleted
-                                    loadingPasswordsBar.setVisibility(View.VISIBLE);
-                                    //final int numPasswords = passwordsLayout[0].getChildCount();
-                                    /*if (numPasswords > 0) {
-                                        for (int password = 0; password < numPasswords; password++) {
-                                            // get card
-                                            LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
-
-                                            String key = "";
-
-                                            // get key of each password
-                                            for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
-                                                View elemView = passwordCard.getChildAt(elem);
-
-                                                if (elemView.getId() == PASSWORD_ID) {
-                                                    key = ((TextView) elemView).getText().toString();
-                                                    break;
+                                } else */{
+                                    // the password list was empty, so there is nothing to delete
+                                    // upload imported passwords
+                                    for (Password importedPassword : mImportedPasswords) {
+                                        // if password is not already in list, add it to Firestore
+                                        SparseArray inList = inList(importedPassword);
+                                        switch (inList.keyAt(0)) {
+                                            case 0: // password is already in list, with all fields the same
+                                                numModified[0]++;
+                                                if (numModified[0] == mImportedPasswords.size()) {
+                                                    // refresh list
+                                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                    finish();
                                                 }
-                                            }
-
-                                            // delete
-                                            mFirestore.collection("passwords").document(key).delete()
-                                                    .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                        @Override
-                                                        public void onSuccess(Void aVoid) {
-                                                            numModified[0]++;
-                                                            if (numModified[0] == numPasswords) {
-                                                                numModified[0] = 0; // reset
-
-                                                                // upload imported passwords
-                                                                for (Password importedPassword : mImportedPasswords) {
-                                                                    Map<String, Object> newPassword = new HashMap<>();
-                                                                    newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                                                                    newPassword.put("name", encryptField(importedPassword.name));
-                                                                    newPassword.put("url", encryptField(importedPassword.url));
-                                                                    newPassword.put("password", encryptField(importedPassword.password));
-                                                                    newPassword.put("note", encryptField(importedPassword.note));
-
-                                                                    mFirestore.collection("passwords").document()
-                                                                            .set(newPassword)
-                                                                            .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                                                @Override
-                                                                                public void onSuccess(Void aVoid) {
-                                                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                                                    numModified[0]++;
-                                                                                    if (numModified[0] == mImportedPasswords.size()) {
-                                                                                        loadingPasswordsBar.setVisibility(View.GONE);
-                                                                                        // refresh list
-                                                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                                                        finish();
-                                                                                    }
-                                                                                }
-                                                                            })
-                                                                            .addOnFailureListener(new OnFailureListener() {
-                                                                                @Override
-                                                                                public void onFailure(@NonNull Exception e) {
-                                                                                    Log.w(TAG, "Error writing document", e);
-                                                                                }
-                                                                            });
-                                                                }
-                                                            }
-                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                break;
+                                            case 1: // password with this name is already in list, with url, password, and/or note being different
+                                                Map<String, Object> newFields = new HashMap<>();
+                                                newFields.put("password", importedPassword.password);
+                                                newFields.put("note", importedPassword.note);
+                                                mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                    @Override
+                                                    public void onSuccess(Void aVoid) {
+                                                        numModified[0]++;
+                                                        if (numModified[0] == mImportedPasswords.size()) {
+                                                            // refresh list
+                                                            startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                            finish();
                                                         }
-                                                    }).addOnFailureListener(new OnFailureListener() {
-                                                @Override
-                                                public void onFailure(@NonNull Exception e) {
-                                                    Log.w(TAG, "Error writing document", e);
-                                                }
-                                            });
-                                        }
-                                    } else */{
-                                        // the password list was empty, so there is nothing to delete
-                                        // upload imported passwords
-                                        for (Password importedPassword : mImportedPasswords) {
-                                            // if password is not already in list, add it to Firestore
-                                            SparseArray inList = inList(importedPassword);
-                                            switch (inList.keyAt(0)) {
-                                                case 0: // password is already in list, with all fields the same
-                                                    numModified[0]++;
-                                                    if (numModified[0] == mImportedPasswords.size()) {
-                                                        // refresh list
-                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                        finish();
+                                                        Log.d(TAG, "DocumentSnapshot successfully written!");
                                                     }
-                                                    break;
-                                                case 1: // password with this name is already in list, with url, password, and/or note being different
-                                                    Map<String, Object> newFields = new HashMap<>();
-                                                    newFields.put("password", importedPassword.password);
-                                                    newFields.put("note", importedPassword.note);
-                                                    mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                        @Override
-                                                        public void onSuccess(Void aVoid) {
+                                                }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                                break;
+                                            case 2: // password is entirely new
+                                                Map<String, Object> newPassword = new HashMap<>();
+                                                newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                                newPassword.put("name", encryptField(importedPassword.name));
+                                                newPassword.put("url", encryptField(importedPassword.url));
+                                                newPassword.put("password", encryptField(importedPassword.password));
+                                                newPassword.put("note", encryptField(importedPassword.note));
+
+                                                mFirestore.collection("passwords").document()
+                                                        .set(newPassword)
+                                                        .addOnSuccessListener(aVoid -> {
+                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
                                                             numModified[0]++;
                                                             if (numModified[0] == mImportedPasswords.size()) {
                                                                 // refresh list
                                                                 startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                                                 finish();
                                                             }
-                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                        }
-                                                    }).addOnFailureListener(new OnFailureListener() {
-                                                        @Override
-                                                        public void onFailure(@NonNull Exception e) {
-                                                            Log.w(TAG, "Error writing document", e);
-                                                        }
-                                                    });
-                                                    break;
-                                                case 2: // password is entirely new
-                                                    Map<String, Object> newPassword = new HashMap<>();
-                                                    newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                                                    newPassword.put("name", encryptField(importedPassword.name));
-                                                    newPassword.put("url", encryptField(importedPassword.url));
-                                                    newPassword.put("password", encryptField(importedPassword.password));
-                                                    newPassword.put("note", encryptField(importedPassword.note));
-
-                                                    mFirestore.collection("passwords").document()
-                                                            .set(newPassword)
-                                                            .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                                @Override
-                                                                public void onSuccess(Void aVoid) {
-                                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                                    numModified[0]++;
-                                                                    if (numModified[0] == mImportedPasswords.size()) {
-                                                                        // refresh list
-                                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                                        finish();
-                                                                    }
-                                                                }
-                                                            })
-                                                            .addOnFailureListener(new OnFailureListener() {
-                                                                @Override
-                                                                public void onFailure(@NonNull Exception e) {
-                                                                    Log.w(TAG, "Error writing document", e);
-                                                                }
-                                                            });
-                                                    break;
-                                            }
+                                                        })
+                                                        .addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                                break;
                                         }
                                     }
-                                } else {
-                                    // sort A-Z
-                                    onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
-                                    passwordsLayout[0] = findViewById(R.id.passwords_layout);
-                                    if (mExportType != null) {
-                                        // if external storage is writable
-                                        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
-                                        {
-                                            // put all password fields in list
-                                            mSerializedPasswords = new ArrayList<>();
-                                            for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
-                                                // get card
-                                                LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
-                                                String name = "", url = "", passwordStr = "", note = "";
+                                }
+                            } else {
+                                // sort A-Z
+                                onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
+                                passwordsLayout[0] = findViewById(R.id.passwords_layout);
+                                if (mExportType != null) {
+                                    // if external storage is writable
+                                    if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
+                                    {
+                                        // put all password fields in list
+                                        mSerializedPasswords = new ArrayList<>();
+                                        for (int password = 0; password < passwordsLayout[0].getChildCount(); password++) {
+                                            // get card
+                                            LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
+                                            String name = "", url = "", passwordStr = "", note = "";
 
-                                                // get key, name, url, password, and note of each password
-                                                for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
-                                                    View elemView = passwordCard.getChildAt(elem);
+                                            // get key, name, url, password, and note of each password
+                                            for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
+                                                View elemView = passwordCard.getChildAt(elem);
 
-                                                    if (elemView instanceof LinearLayout) {
-                                                        for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
-                                                            View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
+                                                if (elemView instanceof LinearLayout) {
+                                                    for (int elemViewElem = 0; elemViewElem < ((LinearLayout) elemView).getChildCount(); elemViewElem++) {
+                                                        View elemViewElemView = ((LinearLayout) elemView).getChildAt(elemViewElem);
 
-                                                            switch (elemViewElemView.getId()) {
-                                                                case NAME_TEXT_VIEW:
-                                                                    name = ((TextView) elemViewElemView).getText().toString();
-                                                                    break;
-                                                                case URL_TEXT_VIEW:
-                                                                    url = ((TextView) elemViewElemView).getText().toString();
-                                                                    break;
-                                                                case PASSWORD_TEXT_VIEW:
-                                                                    passwordStr = ((TextView) elemViewElemView).getText().toString();
-                                                                    break;
-                                                                case NOTE_TEXT_VIEW:
-                                                                    note = ((TextView) elemViewElemView).getText().toString();
-                                                                    break;
-                                                            }
+                                                        switch (elemViewElemView.getId()) {
+                                                            case NAME_TEXT_VIEW:
+                                                                name = ((TextView) elemViewElemView).getText().toString();
+                                                                break;
+                                                            case URL_TEXT_VIEW:
+                                                                url = ((TextView) elemViewElemView).getText().toString();
+                                                                break;
+                                                            case PASSWORD_TEXT_VIEW:
+                                                                passwordStr = ((TextView) elemViewElemView).getText().toString();
+                                                                break;
+                                                            case NOTE_TEXT_VIEW:
+                                                                note = ((TextView) elemViewElemView).getText().toString();
+                                                                break;
                                                         }
                                                     }
                                                 }
-
-                                                mSerializedPasswords.add(new Password(name, url, passwordStr, note));
                                             }
 
-                                            // check if user has granted WRITE_EXTERNAL_STORAGE permission
-                                            boolean hasPermission = (ContextCompat.checkSelfPermission(mContext,
-                                                    WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
-                                            if (hasPermission) {
-                                                switch (mExportType) {
-                                                    case TYPE_XML:
-                                                        writeXMLFile();
-                                                        break;
-                                                    case TYPE_JSON:
-                                                        writeJSONFile();
-                                                        break;
-                                                    case TYPE_CSV:
-                                                        writeCSVFile();
-                                                        break;
-                                                }
-                                            } else {
-                                                requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_STORAGE);
+                                            mSerializedPasswords.add(new Password(name, url, passwordStr, note));
+                                        }
+
+                                        // check if user has granted WRITE_EXTERNAL_STORAGE permission
+                                        boolean hasPermission = (ContextCompat.checkSelfPermission(mContext,
+                                                WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+                                        if (hasPermission) {
+                                            switch (mExportType) {
+                                                case TYPE_XML:
+                                                    writeXMLFile();
+                                                    break;
+                                                case TYPE_JSON:
+                                                    writeJSONFile();
+                                                    break;
+                                                case TYPE_KEEPASS:
+                                                    writeKeePassCSVFile();
+                                                    break;
                                             }
+                                        } else {
+                                            requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_STORAGE);
                                         }
                                     }
                                 }
-
-                                // listen to search input
-                                Intent intent = getIntent();
-                                if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-                                    String query = intent.getStringExtra(SearchManager.QUERY);
-                                    filterResults(query);
-                                }
-                            } else { // it's not initial update
-                                // replace passwordsLayout with filteredPasswordsLayout
-                                for (int i = 0; i < passwordsLayoutParent.getChildCount(); i++) {
-                                    if (passwordsLayoutParent.getChildAt(i).getId() == passwordsLayout[0].getId()) {
-                                        passwordsLayoutParent.removeViewAt(i);
-                                        break;
-                                    }
-                                }
-                                newPasswordsLayout.setId(passwordsLayout[0].getId()); // assign password layout ID to new password layout
-                                passwordsLayoutParent.addView(newPasswordsLayout);
-
-                                // sort A-Z
-                                onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                             }
 
-                            loadingPasswordsBar.setVisibility(View.GONE); // all passwords downloaded
-                        } else {
-                            Log.w(TAG, "Error getting documents.", task.getException());
+                            // listen to search input
+                            Intent intent = getIntent();
+                            if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+                                String query = intent.getStringExtra(SearchManager.QUERY);
+                                filterResults(query);
+                            }
+                        } else { // it's not initial update
+                            // replace passwordsLayout with filteredPasswordsLayout
+                            for (int i = 0; i < passwordsLayoutParent.getChildCount(); i++) {
+                                if (passwordsLayoutParent.getChildAt(i).getId() == passwordsLayout[0].getId()) {
+                                    passwordsLayoutParent.removeViewAt(i);
+                                    break;
+                                }
+                            }
+                            newPasswordsLayout.setId(passwordsLayout[0].getId()); // assign password layout ID to new password layout
+                            passwordsLayoutParent.addView(newPasswordsLayout);
+
+                            // sort A-Z
+                            onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                         }
+
+                        loadingPasswordsBar.setVisibility(View.GONE); // all passwords downloaded
+                    } else {
+                        Log.w(TAG, "Error getting documents.", task.getException());
                     }
                 });
     }
@@ -1324,71 +1337,53 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
         MenuItem clearSearch = menu.findItem(R.id.menu_clear_search);
 
-        clearSearch.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                // disable the "Clear" option
-                mFilter = false;
-                invalidateOptionsMenu();
+        clearSearch.setOnMenuItemClickListener(menuItem -> {
+            // disable the "Clear" option
+            mFilter = false;
+            invalidateOptionsMenu();
 
-                // re-populate list with every password
-                populateList(FirebaseFirestore.getInstance(), mAuth.getCurrentUser(), true);
-                return false;
-            }
+            // re-populate list with every password
+            populateList(FirebaseFirestore.getInstance(), mAuth.getCurrentUser(), true);
+            return false;
         });
 
         MenuItem changeMasterPassword = menu.findItem(R.id.menu_change_master_password);
 
-        changeMasterPassword.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                // take user to change master password activity
-                startActivity(ChangeMasterPasswordActivity.createIntent(mContext, mMasterPassword));
-                finish();
-                return false;
-            }
+        changeMasterPassword.setOnMenuItemClickListener(menuItem -> {
+            // take user to change master password activity
+            startActivity(ChangeMasterPasswordActivity.createIntent(mContext, mMasterPassword));
+            finish();
+            return false;
         });
 
         MenuItem importExportPasswords = menu.findItem(R.id.menu_import_export);
 
-        importExportPasswords.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                // take user to change master password activity
-                startActivity(ImportExportPasswordsActivity.createIntent(mContext, mMasterPassword));
-                finish();
-                return false;
-            }
+        importExportPasswords.setOnMenuItemClickListener(menuItem -> {
+            // take user to change master password activity
+            startActivity(ImportExportPasswordsActivity.createIntent(mContext, mMasterPassword));
+            finish();
+            return false;
         });
 
         MenuItem settings = menu.findItem(R.id.menu_settings);
 
-        settings.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                startActivity(SettingsActivity.createIntent(mContext, mMasterPassword));
-                finish();
-                return false;
-            }
+        settings.setOnMenuItemClickListener(menuItem -> {
+            startActivity(SettingsActivity.createIntent(mContext, mMasterPassword));
+            finish();
+            return false;
         });
 
         MenuItem pwnedPasswords = menu.findItem(R.id.menu_pwned_passwords);
         pwnedPasswords.setVisible(getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false));
-        pwnedPasswords.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                doPwnedCheckOnAllPasswords();
-                return false;
-            }
+        pwnedPasswords.setOnMenuItemClickListener(menuItem -> {
+            doPwnedCheckOnAllPasswords();
+            return false;
         });
 
         MenuItem signOut = menu.findItem(R.id.menu_sign_out);
-        signOut.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem menuItem) {
-                signOutUser();
-                return false;
-            }
+        signOut.setOnMenuItemClickListener(menuItem -> {
+            signOutUser();
+            return false;
         });
 
         return true;
@@ -1399,20 +1394,16 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         AlertDialog.Builder builder = new AlertDialog.Builder(mContext, android.R.style.Theme_Material_Dialog_Alert);
         builder.setTitle("Pwned Passwords Check All?")
                 .setMessage("Are you sure you want to check every password against the Pwned Passwords API?")
-                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        // continue with check
-                        LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
+                .setPositiveButton(android.R.string.yes, (dialog, which) -> {
+                    // continue with check
+                    LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
 
-                        for (int i = 0; i < passwordsLayout.getChildCount(); i++) {
-                            new PwnedPasswordsDownloaderTask(passwordsLayout).execute(((TextView)(passwordsLayout.getChildAt(i)).findViewById(PASSWORD_TEXT_VIEW)).getText().toString());
-                        }
+                    for (int i = 0; i < passwordsLayout.getChildCount(); i++) {
+                        new PwnedPasswordsDownloaderTask(passwordsLayout).execute(((TextView)(passwordsLayout.getChildAt(i)).findViewById(PASSWORD_TEXT_VIEW)).getText().toString());
                     }
                 })
-                .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        // do nothing
-                    }
+                .setNegativeButton(android.R.string.no, (dialog, which) -> {
+                    // do nothing
                 })
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .show();
@@ -1492,6 +1483,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mClipMan = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        mClipMan.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
         setContentView(R.layout.activity_password_list);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(getString(R.string.passwords));
@@ -1499,12 +1492,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         Toolbar toolbar = findViewById(R.id.password_list_toolbar);
         setSupportActionBar(toolbar);
         toolbar.setNavigationIcon(android.support.v7.appcompat.R.drawable.abc_ic_ab_back_material);
-        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                onBackPressed();
-            }
-        });
+        toolbar.setNavigationOnClickListener(view -> onBackPressed());
 
         FirebaseApp.initializeApp(this);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -1537,13 +1525,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
             // add new password
             FloatingActionButton newPasswordBtn = findViewById(R.id.new_password_btn);
-            newPasswordBtn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // take user to new password activity
-                    startActivity(NewPasswordActivity.createIntent(mContext, mMasterPassword));
-                    finish();
-                }
+            newPasswordBtn.setOnClickListener(view -> {
+                // take user to new password activity
+                startActivity(NewPasswordActivity.createIntent(mContext, mMasterPassword));
+                finish();
             });
         } else {
             startActivity(LoginActivity.createIntent(this));
@@ -1583,14 +1568,11 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             }
 
             // sort the list of names
-            Collections.sort(allPasswordNames, new Comparator<String>() {
-                @Override
-                public int compare(String name2, String name1) {
-                    if (sortType.equals("A-Z")) {
-                        return name2.toLowerCase().compareTo(name1.toLowerCase());
-                    } else { // Z-A
-                        return name1.toLowerCase().compareTo(name2.toLowerCase());
-                    }
+            Collections.sort(allPasswordNames, (name2, name1) -> {
+                if (sortType.equals("A-Z")) {
+                    return name2.toLowerCase().compareTo(name1.toLowerCase());
+                } else { // Z-A
+                    return name1.toLowerCase().compareTo(name2.toLowerCase());
                 }
             });
 
@@ -1707,5 +1689,14 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
             dest.writeInt(isCredentialSelectorEnabled ? 1 : 0);
             dest.writeInt(isHintSelectorEnabled ? 1 : 0);
         }
+    }
+
+    @Override
+    protected void onStop() {
+        if (!(mClipMan.getPrimaryClip().getItemAt(0).getText().toString().isEmpty())) {
+            mClipMan.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
+            Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
+        }
+        super.onStop();
     }
 }
