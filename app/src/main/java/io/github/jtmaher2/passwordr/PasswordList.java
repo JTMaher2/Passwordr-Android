@@ -1691,12 +1691,13 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    // clear password from clipboard (if there is any) when app is killed
     @Override
-    protected void onStop() {
+    protected void onDestroy() {
         if (!(mClipMan.getPrimaryClip().getItemAt(0).getText().toString().isEmpty())) {
             mClipMan.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
             Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
         }
-        super.onStop();
+        super.onDestroy();
     }
 }
