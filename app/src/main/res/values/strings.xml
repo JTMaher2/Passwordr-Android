@@ -165,4 +165,5 @@
     <string name="github_client_id" translatable="false">eeaa6f8ae988155d4068</string>
     <string name="github_client_secret" translatable="false">950d4bf6cb92315047e9b0da4fc235e8e8928974</string>
     <string name="firebase_web_host" translatable="false">passwordr-3917b.firebaseapp.com</string>
+    <string name="last_signed_in">Last signed in:</string>
 </resources>

@@ -42,10 +42,10 @@ import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.FirebaseUserMetadata;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -66,6 +66,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,7 @@ import javax.crypto.spec.SecretKeySpec;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 import static android.graphics.Color.GREEN;
 import static android.graphics.Color.RED;
+import static android.view.View.GONE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static com.firebase.ui.auth.util.ExtraConstants.IDP_RESPONSE;
@@ -338,7 +340,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 }
             }
 
-            byte[] decoded = null;
+            byte[] decoded;
             try {
                 Cipher c = Cipher.getInstance("GCM");
                 SecretKeySpec sks = generateKey(mMasterPassword);
@@ -1019,19 +1021,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
                         // if it's initial update
                         if (finalInitial) {
-
-                            /*if (mExportType != null) {
-                                switch (mExportType) {
-                                    case TYPE_XML:
-                                        writeXMLFile();
-                                        break;
-                                    case TYPE_JSON:
-                                        writeJSONFile();
-                                        break;
-                                }
-                            }
                             // if user wants to change the master password
-                            else*/ if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
+                            if (mChangedMasterPassword != null && !mChangedMasterPassword.equals("")) {
                                 mMasterPassword = mChangedMasterPassword; // re-assign master password to new one
 
                                 final int[] numEncrypted = {0}; // the number of passwords that have been re-encrypted
@@ -1084,17 +1075,14 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                     }
 
                                     // upload to firebase
-                                    mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
-                                        @Override
-                                        public void onSuccess(Void aVoid) {
-                                            numEncrypted[0]++;
-                                            if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
-                                                loadingPasswordsBar.setVisibility(View.GONE);
-                                                // sort A-Z
-                                                onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
-                                            }
-                                            Log.d(TAG, "DocumentSnapshot successfully written!");
+                                    mFirestore.collection("passwords").document(key).set(newFields).addOnSuccessListener(aVoid -> {
+                                        numEncrypted[0]++;
+                                        if (numEncrypted[0] == passwordsLayout[0].getChildCount()) {
+                                            loadingPasswordsBar.setVisibility(GONE);
+                                            // sort A-Z
+                                            onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                                         }
+                                        Log.d(TAG, "DocumentSnapshot successfully written!");
                                     }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
                                 }
                             } else if (mImportedPasswords != null && mImportedPasswords.size() > 0) {
@@ -1102,128 +1090,55 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 // delete all of this user's passwords from Firebase
                                 final int[] numModified = {0}; // the number of passwords that have been added or deleted
                                 loadingPasswordsBar.setVisibility(View.VISIBLE);
-                                //final int numPasswords = passwordsLayout[0].getChildCount();
-                                /*if (numPasswords > 0) {
-                                    for (int password = 0; password < numPasswords; password++) {
-                                        // get card
-                                        LinearLayout passwordCard = (LinearLayout) passwordsLayout[0].getChildAt(password);
-
-                                        String key = "";
-
-                                        // get key of each password
-                                        for (int elem = 0; elem < passwordCard.getChildCount(); elem++) {
-                                            View elemView = passwordCard.getChildAt(elem);
-
-                                            if (elemView.getId() == PASSWORD_ID) {
-                                                key = ((TextView) elemView).getText().toString();
-                                                break;
+                                // the password list was empty, so there is nothing to delete
+                                // upload imported passwords
+                                for (Password importedPassword : mImportedPasswords) {
+                                    // if password is not already in list, add it to Firestore
+                                    SparseArray inList = inList(importedPassword);
+                                    switch (inList.keyAt(0)) {
+                                        case 0: // password is already in list, with all fields the same
+                                            numModified[0]++;
+                                            if (numModified[0] == mImportedPasswords.size()) {
+                                                // refresh list
+                                                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                finish();
                                             }
-                                        }
-
-                                        // delete
-                                        mFirestore.collection("passwords").document(key).delete()
-                                                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                    @Override
-                                                    public void onSuccess(Void aVoid) {
-                                                        numModified[0]++;
-                                                        if (numModified[0] == numPasswords) {
-                                                            numModified[0] = 0; // reset
-
-                                                            // upload imported passwords
-                                                            for (Password importedPassword : mImportedPasswords) {
-                                                                Map<String, Object> newPassword = new HashMap<>();
-                                                                newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                                                                newPassword.put("name", encryptField(importedPassword.name));
-                                                                newPassword.put("url", encryptField(importedPassword.url));
-                                                                newPassword.put("password", encryptField(importedPassword.password));
-                                                                newPassword.put("note", encryptField(importedPassword.note));
-
-                                                                mFirestore.collection("passwords").document()
-                                                                        .set(newPassword)
-                                                                        .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                                            @Override
-                                                                            public void onSuccess(Void aVoid) {
-                                                                                Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                                                numModified[0]++;
-                                                                                if (numModified[0] == mImportedPasswords.size()) {
-                                                                                    loadingPasswordsBar.setVisibility(View.GONE);
-                                                                                    // refresh list
-                                                                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                                                    finish();
-                                                                                }
-                                                                            }
-                                                                        })
-                                                                        .addOnFailureListener(new OnFailureListener() {
-                                                                            @Override
-                                                                            public void onFailure(@NonNull Exception e) {
-                                                                                Log.w(TAG, "Error writing document", e);
-                                                                            }
-                                                                        });
-                                                            }
-                                                        }
-                                                        Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                    }
-                                                }).addOnFailureListener(new OnFailureListener() {
-                                            @Override
-                                            public void onFailure(@NonNull Exception e) {
-                                                Log.w(TAG, "Error writing document", e);
-                                            }
-                                        });
-                                    }
-                                } else */{
-                                    // the password list was empty, so there is nothing to delete
-                                    // upload imported passwords
-                                    for (Password importedPassword : mImportedPasswords) {
-                                        // if password is not already in list, add it to Firestore
-                                        SparseArray inList = inList(importedPassword);
-                                        switch (inList.keyAt(0)) {
-                                            case 0: // password is already in list, with all fields the same
+                                            break;
+                                        case 1: // password with this name is already in list, with url, password, and/or note being different
+                                            Map<String, Object> newFields = new HashMap<>();
+                                            newFields.put("password", importedPassword.password);
+                                            newFields.put("note", importedPassword.note);
+                                            mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(aVoid -> {
                                                 numModified[0]++;
                                                 if (numModified[0] == mImportedPasswords.size()) {
                                                     // refresh list
                                                     startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                                     finish();
                                                 }
-                                                break;
-                                            case 1: // password with this name is already in list, with url, password, and/or note being different
-                                                Map<String, Object> newFields = new HashMap<>();
-                                                newFields.put("password", importedPassword.password);
-                                                newFields.put("note", importedPassword.note);
-                                                mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                    @Override
-                                                    public void onSuccess(Void aVoid) {
+                                                Log.d(TAG, "DocumentSnapshot successfully written!");
+                                            }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                            break;
+                                        case 2: // password is entirely new
+                                            Map<String, Object> newPassword = new HashMap<>();
+                                            newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
+                                            newPassword.put("name", encryptField(importedPassword.name));
+                                            newPassword.put("url", encryptField(importedPassword.url));
+                                            newPassword.put("password", encryptField(importedPassword.password));
+                                            newPassword.put("note", encryptField(importedPassword.note));
+
+                                            mFirestore.collection("passwords").document()
+                                                    .set(newPassword)
+                                                    .addOnSuccessListener(aVoid -> {
+                                                        Log.d(TAG, "DocumentSnapshot successfully written!");
                                                         numModified[0]++;
                                                         if (numModified[0] == mImportedPasswords.size()) {
                                                             // refresh list
                                                             startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
                                                             finish();
                                                         }
-                                                        Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                    }
-                                                }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
-                                                break;
-                                            case 2: // password is entirely new
-                                                Map<String, Object> newPassword = new HashMap<>();
-                                                newPassword.put("userid", mAuth.getCurrentUser() == null ? "" : mAuth.getCurrentUser().getUid()); // associate this password with current user
-                                                newPassword.put("name", encryptField(importedPassword.name));
-                                                newPassword.put("url", encryptField(importedPassword.url));
-                                                newPassword.put("password", encryptField(importedPassword.password));
-                                                newPassword.put("note", encryptField(importedPassword.note));
-
-                                                mFirestore.collection("passwords").document()
-                                                        .set(newPassword)
-                                                        .addOnSuccessListener(aVoid -> {
-                                                            Log.d(TAG, "DocumentSnapshot successfully written!");
-                                                            numModified[0]++;
-                                                            if (numModified[0] == mImportedPasswords.size()) {
-                                                                // refresh list
-                                                                startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                                finish();
-                                                            }
-                                                        })
-                                                        .addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
-                                                break;
-                                        }
+                                                    })
+                                                    .addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                            break;
                                     }
                                 }
                             } else {
@@ -1313,7 +1228,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                             onItemSelected(sortOptions, sortOptions.getChildAt(0), 0, 0);
                         }
 
-                        loadingPasswordsBar.setVisibility(View.GONE); // all passwords downloaded
+                        loadingPasswordsBar.setVisibility(GONE); // all passwords downloaded
                     } else {
                         Log.w(TAG, "Error getting documents.", task.getException());
                     }
@@ -1530,6 +1445,47 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 startActivity(NewPasswordActivity.createIntent(mContext, mMasterPassword));
                 finish();
             });
+
+            // get list signed in time
+            db.collection("settings")
+                    .document(curUser.getUid())
+                    .get()
+                    .addOnCompleteListener(task -> {
+                            if (task.isSuccessful()) {
+                                DocumentSnapshot d = task.getResult();
+                                String lastSignedIn = d.getString("lastSignInTime");
+
+                                ((TextView) findViewById(R.id.lastSignedIn)).setText(lastSignedIn);
+                                LinearLayout lastSignInLayout = findViewById(R.id.lastSignInLayout);
+                                lastSignInLayout.setVisibility(View.VISIBLE);
+                                // show the last signed in time for 10 seconds
+                                CountDownTimer cdt = new CountDownTimer(10000L, 1L) {
+                                    @Override
+                                    public void onTick(long l) {
+
+                                    }
+
+                                    @Override
+                                    public void onFinish() {
+                                        lastSignInLayout.setVisibility(GONE);
+                                    }
+                                };
+                                cdt.start();
+
+                                FirebaseUserMetadata metadata = curUser.getMetadata();
+                                if (metadata != null) {
+                                    // write new sign in time to database
+                                    lastSignedIn = new Date(metadata.getLastSignInTimestamp()).toString();
+
+                                    Map<String, Object> newSettings = new HashMap<>();
+                                    newSettings.put("enableHIBP", d.getBoolean("enableHIBP")); // associate this password with current user
+                                    newSettings.put("lastSignInTime", lastSignedIn);
+
+                                    mFirestore.collection("settings").document()
+                                            .set(newSettings);
+                                }
+                            }
+                        });
         } else {
             startActivity(LoginActivity.createIntent(this));
             finish();
