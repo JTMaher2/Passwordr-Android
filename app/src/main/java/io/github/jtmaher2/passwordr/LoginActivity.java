@@ -28,7 +28,6 @@ import java.util.Collections;
 public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
     private static final String FIREBASE_TOS_URL = "https://firebase.google.com/terms/";
     private static final String FIREBASE_PRIVACY_POLICY_URL = "https://firebase.google.com/terms/analytics/#7_privacy";
-    private static final String TAG = "Login Activity";
     private static final int RC_SIGN_IN = 9001;
 
     // UI references.
