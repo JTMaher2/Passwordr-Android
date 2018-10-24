@@ -48,6 +48,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.FirebaseUserMetadata;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -844,178 +845,182 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        loop: for (DocumentSnapshot document : task.getResult()) {
-                            LinearLayout passwordCard = new LinearLayout(mContext);
-                            passwordCard.setOrientation(LinearLayout.VERTICAL);
+                        QuerySnapshot result = task.getResult();
+                        if (result != null)
+                        {
+                            loop: for (DocumentSnapshot document : result) {
+                                LinearLayout passwordCard = new LinearLayout(mContext);
+                                passwordCard.setOrientation(LinearLayout.VERTICAL);
 
-                            // name
-                            LinearLayout nameLayout = new LinearLayout(mContext);
-                            nameLayout.setOrientation(LinearLayout.HORIZONTAL);
-                            TextView nameLabelTextView = new TextView(mContext);
-                            nameLabelTextView.setText(R.string.name_label);
-                            nameLayout.addView(nameLabelTextView);
-                            TextView nameTextView = new TextView(mContext);
-                            String decryptedName = decryptField(document.getString("name"));
-                            switch (mDecryptStatus) {
-                                case DECRYPT_SUCCESS:
-                                case DECRYPT_NULL:
-                                    nameTextView.setText(decryptedName);
-                                    break;
-                                case DECRYPT_ERROR:
-                                    // wrong password, so take user back to login activity
-                                    startActivity(LoginActivity.createIntent(mContext));
-                                    finish();
-                                    break loop;
-                            }
-                            nameTextView.setId(NAME_TEXT_VIEW);
-                            nameLayout.addView(nameTextView);
-                            passwordCard.addView(nameLayout);
+                                // name
+                                LinearLayout nameLayout = new LinearLayout(mContext);
+                                nameLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView nameLabelTextView = new TextView(mContext);
+                                nameLabelTextView.setText(R.string.name_label);
+                                nameLayout.addView(nameLabelTextView);
+                                TextView nameTextView = new TextView(mContext);
+                                String decryptedName = decryptField(document.getString("name"));
+                                switch (mDecryptStatus) {
+                                    case DECRYPT_SUCCESS:
+                                    case DECRYPT_NULL:
+                                        nameTextView.setText(decryptedName);
+                                        break;
+                                    case DECRYPT_ERROR:
+                                        // wrong password, so take user back to login activity
+                                        startActivity(LoginActivity.createIntent(mContext));
+                                        finish();
+                                        break loop;
+                                }
+                                nameTextView.setId(NAME_TEXT_VIEW);
+                                nameLayout.addView(nameTextView);
+                                passwordCard.addView(nameLayout);
 
-                            // url
-                            LinearLayout urlLayout = new LinearLayout(mContext);
-                            urlLayout.setOrientation(LinearLayout.HORIZONTAL);
-                            TextView urlLabelTextView = new TextView(mContext);
-                            urlLabelTextView.setText(R.string.url_label);
-                            urlLayout.addView(urlLabelTextView);
-                            TextView urlTextView = new TextView(mContext);
-                            String decryptedUrl = decryptField(document.getString("url"));
-                            switch (mDecryptStatus)
-                            {
-                                case DECRYPT_SUCCESS:
-                                case DECRYPT_NULL:
-                                    urlTextView.setText(decryptedUrl);
-                                    break;
-                                case DECRYPT_ERROR:
-                                    // wrong password, so take user back to login activity
-                                    startActivity(LoginActivity.createIntent(mContext));
-                                    finish();
-                                    break loop;
-                            }
-                            urlTextView.setId(URL_TEXT_VIEW);
-                            Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
-                            urlLayout.addView(urlTextView);
-                            passwordCard.addView(urlLayout);
+                                // url
+                                LinearLayout urlLayout = new LinearLayout(mContext);
+                                urlLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView urlLabelTextView = new TextView(mContext);
+                                urlLabelTextView.setText(R.string.url_label);
+                                urlLayout.addView(urlLabelTextView);
+                                TextView urlTextView = new TextView(mContext);
+                                String decryptedUrl = decryptField(document.getString("url"));
+                                switch (mDecryptStatus)
+                                {
+                                    case DECRYPT_SUCCESS:
+                                    case DECRYPT_NULL:
+                                        urlTextView.setText(decryptedUrl);
+                                        break;
+                                    case DECRYPT_ERROR:
+                                        // wrong password, so take user back to login activity
+                                        startActivity(LoginActivity.createIntent(mContext));
+                                        finish();
+                                        break loop;
+                                }
+                                urlTextView.setId(URL_TEXT_VIEW);
+                                Linkify.addLinks(urlTextView, Linkify.WEB_URLS);
+                                urlLayout.addView(urlTextView);
+                                passwordCard.addView(urlLayout);
 
-                            // password
-                            LinearLayout passwordLabelLayout = new LinearLayout(mContext);
-                            passwordLabelLayout.setId(PASSWORD_LABEL_LAYOUT);
-                            passwordLabelLayout.setOrientation(LinearLayout.HORIZONTAL);
-                            passwordLabelLayout.setMinimumWidth(MATCH_PARENT);
-                            passwordLabelLayout.setMinimumHeight(WRAP_CONTENT);
-                            TextView passwordLabelTextView = new TextView(mContext);
-                            passwordLabelTextView.setText(R.string.password_label);
-                            passwordLabelLayout.addView(passwordLabelTextView);
-                            View emptyView = new View(mContext);
-                            emptyView.setMinimumWidth(0);
-                            emptyView.setMinimumHeight(0);
-                            emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
-                            passwordLabelLayout.addView(emptyView);
-                            Button showPasswordButton = new Button(mContext);
-                            showPasswordButton.setWidth(WRAP_CONTENT);
-                            showPasswordButton.setHeight(WRAP_CONTENT);
-                            showPasswordButton.setText(R.string.show);
-                            showPasswordButton.setOnClickListener(showPasswordListener);
-                            passwordLabelLayout.addView(showPasswordButton);
-                            passwordCard.addView(passwordLabelLayout);
-                            LinearLayout passwordLayout = new LinearLayout(mContext);
-                            passwordLayout.setId(PASSWORD_LAYOUT);
-                            passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
-                            passwordLayout.setMinimumWidth(MATCH_PARENT);
-                            passwordLayout.setMinimumHeight(WRAP_CONTENT);
-                            TextView passwordTextView = new TextView(mContext);
-                            String decryptedPassword = decryptField(document.getString("password"));
-                            switch (mDecryptStatus)
-                            {
-                                case DECRYPT_SUCCESS:
-                                case DECRYPT_NULL:
-                                    passwordTextView.setText(decryptedPassword);
-                                    break;
-                                case DECRYPT_ERROR:
-                                    // wrong password, so take user back to login activity
-                                    startActivity(LoginActivity.createIntent(mContext));
-                                    finish();
-                                    break loop;
-                            }
-                            passwordTextView.setId(PASSWORD_TEXT_VIEW);
-                            passwordTextView.setVisibility(View.INVISIBLE);
-                            passwordTextView.setTextSize(PASSWORD_TEXT_SIZE);
-                            passwordLayout.addView(passwordTextView);
-                            View emptyView2 = new View(mContext);
-                            emptyView2.setMinimumWidth(0);
-                            emptyView2.setMinimumHeight(0);
-                            emptyView2.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
-                            passwordLayout.addView(emptyView2);
-                            Button copyPasswordButton = new Button(mContext);
-                            copyPasswordButton.setText(R.string.copy);
-                            copyPasswordButton.setOnClickListener(copyPasswordListener);
-                            passwordLayout.addView(copyPasswordButton);
-                            passwordCard.addView(passwordLayout);
+                                // password
+                                LinearLayout passwordLabelLayout = new LinearLayout(mContext);
+                                passwordLabelLayout.setId(PASSWORD_LABEL_LAYOUT);
+                                passwordLabelLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                passwordLabelLayout.setMinimumWidth(MATCH_PARENT);
+                                passwordLabelLayout.setMinimumHeight(WRAP_CONTENT);
+                                TextView passwordLabelTextView = new TextView(mContext);
+                                passwordLabelTextView.setText(R.string.password_label);
+                                passwordLabelLayout.addView(passwordLabelTextView);
+                                View emptyView = new View(mContext);
+                                emptyView.setMinimumWidth(0);
+                                emptyView.setMinimumHeight(0);
+                                emptyView.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                                passwordLabelLayout.addView(emptyView);
+                                Button showPasswordButton = new Button(mContext);
+                                showPasswordButton.setWidth(WRAP_CONTENT);
+                                showPasswordButton.setHeight(WRAP_CONTENT);
+                                showPasswordButton.setText(R.string.show);
+                                showPasswordButton.setOnClickListener(showPasswordListener);
+                                passwordLabelLayout.addView(showPasswordButton);
+                                passwordCard.addView(passwordLabelLayout);
+                                LinearLayout passwordLayout = new LinearLayout(mContext);
+                                passwordLayout.setId(PASSWORD_LAYOUT);
+                                passwordLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                passwordLayout.setMinimumWidth(MATCH_PARENT);
+                                passwordLayout.setMinimumHeight(WRAP_CONTENT);
+                                TextView passwordTextView = new TextView(mContext);
+                                String decryptedPassword = decryptField(document.getString("password"));
+                                switch (mDecryptStatus)
+                                {
+                                    case DECRYPT_SUCCESS:
+                                    case DECRYPT_NULL:
+                                        passwordTextView.setText(decryptedPassword);
+                                        break;
+                                    case DECRYPT_ERROR:
+                                        // wrong password, so take user back to login activity
+                                        startActivity(LoginActivity.createIntent(mContext));
+                                        finish();
+                                        break loop;
+                                }
+                                passwordTextView.setId(PASSWORD_TEXT_VIEW);
+                                passwordTextView.setVisibility(View.INVISIBLE);
+                                passwordTextView.setTextSize(PASSWORD_TEXT_SIZE);
+                                passwordLayout.addView(passwordTextView);
+                                View emptyView2 = new View(mContext);
+                                emptyView2.setMinimumWidth(0);
+                                emptyView2.setMinimumHeight(0);
+                                emptyView2.setLayoutParams(new LinearLayout.LayoutParams(ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT, 1.0f));
+                                passwordLayout.addView(emptyView2);
+                                Button copyPasswordButton = new Button(mContext);
+                                copyPasswordButton.setText(R.string.copy);
+                                copyPasswordButton.setOnClickListener(copyPasswordListener);
+                                passwordLayout.addView(copyPasswordButton);
+                                passwordCard.addView(passwordLayout);
 
-                            // note
-                            LinearLayout noteLayout = new LinearLayout(mContext);
-                            noteLayout.setOrientation(LinearLayout.HORIZONTAL);
-                            TextView noteLabelTextView = new TextView(mContext);
-                            noteLabelTextView.setText(R.string.note);
-                            noteLayout.addView(noteLabelTextView);
-                            TextView noteTextView = new TextView(mContext);
-                            String decryptedNote = decryptField(document.getString("note"));
-                            // if it's not empty, add a newline
+                                // note
+                                LinearLayout noteLayout = new LinearLayout(mContext);
+                                noteLayout.setOrientation(LinearLayout.HORIZONTAL);
+                                TextView noteLabelTextView = new TextView(mContext);
+                                noteLabelTextView.setText(R.string.note);
+                                noteLayout.addView(noteLabelTextView);
+                                TextView noteTextView = new TextView(mContext);
+                                String decryptedNote = decryptField(document.getString("note"));
+                                // if it's not empty, add a newline
                             /*if (decryptedNote != null && !decryptedNote.equals(" "))
                                 decryptedNote += "\n";*/
-                            switch (mDecryptStatus)
-                            {
-                                case DECRYPT_SUCCESS:
-                                case DECRYPT_NULL:
-                                    noteTextView.setText(decryptedNote);
-                                    break;
-                                case DECRYPT_ERROR:
-                                    // wrong password, so take user back to login activity
-                                    startActivity(LoginActivity.createIntent(mContext));
-                                    finish();
-                                    break loop;
-                            }
-                            noteTextView.setId(NOTE_TEXT_VIEW);
-                            noteLayout.addView(noteTextView);
-                            passwordCard.addView(noteLayout);
+                                switch (mDecryptStatus)
+                                {
+                                    case DECRYPT_SUCCESS:
+                                    case DECRYPT_NULL:
+                                        noteTextView.setText(decryptedNote);
+                                        break;
+                                    case DECRYPT_ERROR:
+                                        // wrong password, so take user back to login activity
+                                        startActivity(LoginActivity.createIntent(mContext));
+                                        finish();
+                                        break loop;
+                                }
+                                noteTextView.setId(NOTE_TEXT_VIEW);
+                                noteLayout.addView(noteTextView);
+                                passwordCard.addView(noteLayout);
 
-                            // Edit & Delete button layout
-                            LinearLayout editDeleteAndCheckButtons = new LinearLayout(mContext);
-                            editDeleteAndCheckButtons.setId(EDIT_AND_DELETE_BUTTONS);
-                            editDeleteAndCheckButtons.setOrientation(LinearLayout.HORIZONTAL);
+                                // Edit & Delete button layout
+                                LinearLayout editDeleteAndCheckButtons = new LinearLayout(mContext);
+                                editDeleteAndCheckButtons.setId(EDIT_AND_DELETE_BUTTONS);
+                                editDeleteAndCheckButtons.setOrientation(LinearLayout.HORIZONTAL);
 
-                            // Edit button
-                            Button editButton = new Button(mContext);
-                            editButton.setText(R.string.edit);
-                            editButton.setOnClickListener(editPasswordListener);
-                            editDeleteAndCheckButtons.addView(editButton);
+                                // Edit button
+                                Button editButton = new Button(mContext);
+                                editButton.setText(R.string.edit);
+                                editButton.setOnClickListener(editPasswordListener);
+                                editDeleteAndCheckButtons.addView(editButton);
 
-                            // Delete button
-                            Button deleteButton = new Button(mContext);
-                            deleteButton.setText(R.string.delete);
-                            deleteButton.setOnClickListener(deletePasswordListener);
-                            editDeleteAndCheckButtons.addView(deleteButton);
+                                // Delete button
+                                Button deleteButton = new Button(mContext);
+                                deleteButton.setText(R.string.delete);
+                                deleteButton.setOnClickListener(deletePasswordListener);
+                                editDeleteAndCheckButtons.addView(deleteButton);
 
-                            // if user has enabled pwned passwords, add additional "Check" button
-                            if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
-                                Button checkPwnedButton = new Button(mContext);
-                                checkPwnedButton.setText(R.string.check);
-                                checkPwnedButton.setOnClickListener(checkPwnedListener);
-                                editDeleteAndCheckButtons.addView(checkPwnedButton);
-                            }
+                                // if user has enabled pwned passwords, add additional "Check" button
+                                if (getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).getBoolean(PWNED_PASSWORDS_ENABLED, false)) {
+                                    Button checkPwnedButton = new Button(mContext);
+                                    checkPwnedButton.setText(R.string.check);
+                                    checkPwnedButton.setOnClickListener(checkPwnedListener);
+                                    editDeleteAndCheckButtons.addView(checkPwnedButton);
+                                }
 
-                            passwordCard.addView(editDeleteAndCheckButtons);
+                                passwordCard.addView(editDeleteAndCheckButtons);
 
-                            // Password ID
-                            TextView passwordID = new TextView(mContext);
-                            passwordID.setText(document.getId());
-                            passwordID.setVisibility(View.INVISIBLE);
-                            passwordID.setId(PASSWORD_ID);
-                            passwordCard.addView(passwordID);
+                                // Password ID
+                                TextView passwordID = new TextView(mContext);
+                                passwordID.setText(document.getId());
+                                passwordID.setVisibility(View.INVISIBLE);
+                                passwordID.setId(PASSWORD_ID);
+                                passwordCard.addView(passwordID);
 
-                            if (finalInitial) {
-                                passwordsLayout[0].addView(passwordCard);
-                            } else {
-                                newPasswordsLayout.addView(passwordCard);
+                                if (finalInitial) {
+                                    passwordsLayout[0].addView(passwordCard);
+                                } else {
+                                    newPasswordsLayout.addView(passwordCard);
+                                }
                             }
                         }
 
@@ -1453,7 +1458,11 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                     .addOnCompleteListener(task -> {
                             if (task.isSuccessful()) {
                                 DocumentSnapshot d = task.getResult();
-                                String lastSignedIn = d.getString("lastSignInTime");
+                                String lastSignedIn = "";
+                                if (d != null)
+                                {
+                                    lastSignedIn = d.getString("lastSignInTime");
+                                }
 
                                 ((TextView) findViewById(R.id.lastSignedIn)).setText(lastSignedIn);
                                 LinearLayout lastSignInLayout = findViewById(R.id.lastSignInLayout);
@@ -1478,6 +1487,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                     lastSignedIn = new Date(metadata.getLastSignInTimestamp()).toString();
 
                                     Map<String, Object> newSettings = new HashMap<>();
+
                                     newSettings.put("enableHIBP", d.getBoolean("enableHIBP")); // associate this password with current user
                                     newSettings.put("lastSignInTime", lastSignedIn);
 

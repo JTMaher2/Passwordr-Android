@@ -3,14 +3,15 @@ package io.github.jtmaher2.passwordr;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
-import android.app.LoaderManager.LoaderCallbacks;
 import android.content.Context;
 import android.content.Intent;
-import android.content.Loader;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.MainThread;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.LoaderManager;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.EditText;
@@ -25,7 +26,7 @@ import java.util.Collections;
 /**
  * A login screen that offers login via email/password.
  */
-public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+public class LoginActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
     private static final String FIREBASE_TOS_URL = "https://firebase.google.com/terms/";
     private static final String FIREBASE_PRIVACY_POLICY_URL = "https://firebase.google.com/terms/analytics/#7_privacy";
     private static final String TAG = "Login Activity";
@@ -141,18 +142,19 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         });
     }
 
+    @NonNull
     @Override
-    public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+    public android.support.v4.content.Loader<Cursor> onCreateLoader(int i, @Nullable Bundle bundle) {
         return null;
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
+    public void onLoadFinished(@NonNull android.support.v4.content.Loader<Cursor> loader, Cursor cursor) {
 
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull android.support.v4.content.Loader<Cursor> loader) {
 
     }
 }
