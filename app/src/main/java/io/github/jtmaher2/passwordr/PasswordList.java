@@ -751,7 +751,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     }
 
     // check if a password is in the list
-    private SparseArray inList(Password password) {
+    private SparseArray<String> inList(Password password) {
         LinearLayout passwordsLayout = findViewById(R.id.passwords_layout);
         boolean inList = false;
         String urlInList = "", passwordInList = "", noteInList = "", keyInList = "";
@@ -808,7 +808,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         } else {
             retVal = 2; // the password is not in the list
         }
-        SparseArray retSparseArray = new SparseArray();
+        SparseArray<String> retSparseArray = new SparseArray<>();
         retSparseArray.append(retVal, keyInList);
         return retSparseArray;
     }
@@ -1099,7 +1099,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                 // upload imported passwords
                                 for (Password importedPassword : mImportedPasswords) {
                                     // if password is not already in list, add it to Firestore
-                                    SparseArray inList = inList(importedPassword);
+                                    SparseArray<String> inList = inList(importedPassword);
                                     switch (inList.keyAt(0)) {
                                         case 0: // password is already in list, with all fields the same
                                             numModified[0]++;
@@ -1113,7 +1113,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                             Map<String, Object> newFields = new HashMap<>();
                                             newFields.put("password", importedPassword.password);
                                             newFields.put("note", importedPassword.note);
-                                            mFirestore.collection("passwords").document((String)inList.valueAt(0)).set(newFields).addOnSuccessListener(aVoid -> {
+                                            mFirestore.collection("passwords").document(inList.valueAt(0)).set(newFields).addOnSuccessListener(aVoid -> {
                                                 numModified[0]++;
                                                 if (numModified[0] == mImportedPasswords.size()) {
                                                     // refresh list
@@ -1411,7 +1411,7 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         }
         Toolbar toolbar = findViewById(R.id.password_list_toolbar);
         setSupportActionBar(toolbar);
-        toolbar.setNavigationIcon(android.support.v7.appcompat.R.drawable.abc_ic_ab_back_material);
+        toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_material);
         toolbar.setNavigationOnClickListener(view -> onBackPressed());
 
         FirebaseApp.initializeApp(this);
