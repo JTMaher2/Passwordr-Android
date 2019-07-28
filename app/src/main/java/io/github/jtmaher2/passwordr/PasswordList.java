@@ -14,13 +14,14 @@ import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.Toolbar;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
+
 import android.text.util.Linkify;
 import android.util.Log;
 import android.util.SparseArray;
@@ -42,6 +43,7 @@ import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -64,6 +66,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,7 +77,10 @@ import java.util.Map;
 import java.util.Random;
 
 import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
@@ -94,7 +100,6 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final int MILLISECONDS_IN_SECOND = 1000;
 
     private static final int IV_LEN = 12;
-    private static final int MASTER_PASSWORD_LENGTH = 32;
     private static final int PASSWORD_TEXT_SIZE = 20;
     private static final int NAME_TEXT_VIEW = 42;
     private static final int URL_TEXT_VIEW = 43;
@@ -107,6 +112,10 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private static final int DECRYPT_SUCCESS = 50;
     private static final int DECRYPT_ERROR = 51;
     private static final int DECRYPT_NULL = 52;
+    private static final int SALT_BYTES = 24;
+    private static final int PBKDF2_ITERATIONS = 1000;
+    private static final int HASH_BYTES = 24;
+    private static final int GCM_LEN = 128;
     private static final String TYPE_XML = "text/xml";
     private static final String TYPE_JSON = "application/octet-stream";
     private static final String TYPE_KEEPASS = "text/keepass";
@@ -291,30 +300,36 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         String encryptedString = "";
 
         try {
-            GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
-            SecretKeySpec sks = generateKey(mMasterPassword);
+            GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(GCM_LEN, iv);
+            SecureRandom random = new SecureRandom();
+            byte[] salt = new byte[SALT_BYTES];
+            random.nextBytes(salt);
+
+            SecretKey sk = generateKey(mMasterPassword, salt);
 
             Cipher c = Cipher.getInstance("GCM");
-            c.init(Cipher.ENCRYPT_MODE, sks, gcmParameterSpec);
+            c.init(Cipher.ENCRYPT_MODE, sk, gcmParameterSpec);
 
             // encrypt
             byte[] encrypted = c.doFinal(field.getBytes());
 
-            // combine IV + encrypted field together
-            byte[] ivEncrypted = new byte[IV_LEN + encrypted.length];
-            for (int i = 0; i < ivEncrypted.length; i++) {
-                if (i < IV_LEN) {
-                    ivEncrypted[i] = iv[i];
+            // combine master password salt + IV + encrypted field together
+            byte[] mpwSaltIVEncrypted = new byte[SALT_BYTES + IV_LEN + encrypted.length];
+            for (int i = 0; i < mpwSaltIVEncrypted.length; i++) {
+                if (i < SALT_BYTES) {
+                    mpwSaltIVEncrypted[i] = salt[i];
+                } else if (i < SALT_BYTES + IV_LEN) {
+                    mpwSaltIVEncrypted[i] = iv[i - SALT_BYTES];
                 } else {
-                    ivEncrypted[i] = encrypted[i - IV_LEN];
+                    mpwSaltIVEncrypted[i] = encrypted[i - IV_LEN - SALT_BYTES];
                 }
             }
 
             // convert to string
             StringBuilder output = new StringBuilder();
-            for (int encryptedByte = 0; encryptedByte < ivEncrypted.length; encryptedByte++) {
-                output.append(ivEncrypted[encryptedByte]);
-                if (encryptedByte < ivEncrypted.length - 1) {
+            for (int encryptedByte = 0; encryptedByte < mpwSaltIVEncrypted.length; encryptedByte++) {
+                output.append(mpwSaltIVEncrypted[encryptedByte]);
+                if (encryptedByte < mpwSaltIVEncrypted.length - 1) {
                     output.append(",");
                 }
             }
@@ -330,22 +345,26 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     private String decryptField(String field) {
         if (field != null && !field.isEmpty()) {
             String[] digits = field.split(",");
-            byte[] iv = new byte[IV_LEN],
-                    data = new byte[digits.length - IV_LEN];
+            byte[] mpwSalt = new byte[SALT_BYTES],
+                    iv = new byte[IV_LEN],
+                    data = new byte[digits.length - IV_LEN - SALT_BYTES];
 
             for (int i = 0; i < digits.length; i++) {
-                if (i < IV_LEN) {
-                    iv[i] = Byte.parseByte(digits[i]);
+                if (i < SALT_BYTES) {
+                    mpwSalt[i] = Byte.parseByte(digits[i]);
+                }
+                else if (i < IV_LEN + SALT_BYTES) {
+                    iv[i - SALT_BYTES] = Byte.parseByte(digits[i]);
                 } else {
-                    data[i - IV_LEN] = Byte.parseByte(digits[i]);
+                    data[i - IV_LEN - SALT_BYTES] = Byte.parseByte(digits[i]);
                 }
             }
 
             byte[] decoded;
             try {
                 Cipher c = Cipher.getInstance("GCM");
-                SecretKeySpec sks = generateKey(mMasterPassword);
-                GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+                SecretKey sks = generateKey(mMasterPassword, mpwSalt);
+                GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(GCM_LEN, iv);
                 c.init(Cipher.DECRYPT_MODE, sks, gcmParameterSpec);
                 decoded = c.doFinal(data);
             } catch (Exception e) {
@@ -666,10 +685,11 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
 
             for (int p = 0; p < mSerializedPasswords.size(); p++) {
                 Password curPass = mSerializedPasswords.get(p);
-                output.append(curPass.name.replace('\n', ' ').replace("\"", "\\\"")).append(',')
-                        .append(curPass.url.replace('\n', ' ').replace("\"", "\\\"")).append(',')
-                        .append(curPass.password.replace('\n', ' ').replace("\"", "\\\"")).append(',')
-                        .append(curPass.note.replace('\n', ' ').replace("\"", "\\\"")).append('\n');
+
+                output.append(curPass.name == null ? "" : curPass.name.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.url == null ? "" : curPass.url.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.password == null ? "" : curPass.password.replace('\n', ' ').replace("\"", "\\\"")).append(',')
+                        .append(curPass.note == null ? "" : curPass.note.replace('\n', ' ').replace("\"", "\\\"")).append('\n');
             }
             fileos.write(output.toString().getBytes());
             fileos.close();
@@ -682,26 +702,20 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode)
+        if (requestCode == REQUEST_WRITE_STORAGE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
         {
-            case REQUEST_WRITE_STORAGE: {
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                {
-                    switch (mExportType) {
-                        case TYPE_XML:
-                            writeXMLFile();
-                            break;
-                        case TYPE_JSON:
-                            writeJSONFile();
-                            break;
-                        case TYPE_KEEPASS:
-                            writeKeePassCSVFile();
-                    }
-                } else
-                {
-                    Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
-                }
+            switch (mExportType) {
+                case TYPE_XML:
+                    writeXMLFile();
+                    break;
+                case TYPE_JSON:
+                    writeJSONFile();
+                    break;
+                case TYPE_KEEPASS:
+                    writeKeePassCSVFile();
             }
+        } else {
+            Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
         }
 
     }
@@ -1062,10 +1076,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                                         for (int elemViewElemViewElem = 0; elemViewElemViewElem < ((LinearLayout) elemViewElemView).getChildCount(); elemViewElemViewElem++) {
                                                             View elemViewElemViewElemView = ((LinearLayout) elemViewElemView).getChildAt(elemViewElemViewElem);
 
-                                                            switch (elemViewElemViewElemView.getId()) {
-                                                                case PASSWORD_TEXT_VIEW:
-                                                                    newFields.put("password", encryptField(((TextView) elemViewElemViewElemView).getText().toString()));
-                                                                    break;
+                                                            if (elemViewElemViewElemView.getId() == PASSWORD_TEXT_VIEW) {
+                                                                newFields.put("password", encryptField(((TextView) elemViewElemViewElemView).getText().toString()));
                                                             }
                                                         }
                                                         break;
@@ -1111,17 +1123,19 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
                                             break;
                                         case 1: // password with this name is already in list, with url, password, and/or note being different
                                             Map<String, Object> newFields = new HashMap<>();
-                                            newFields.put("password", importedPassword.password);
-                                            newFields.put("note", importedPassword.note);
-                                            mFirestore.collection("passwords").document(inList.valueAt(0)).set(newFields).addOnSuccessListener(aVoid -> {
-                                                numModified[0]++;
-                                                if (numModified[0] == mImportedPasswords.size()) {
-                                                    // refresh list
-                                                    startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
-                                                    finish();
-                                                }
-                                                Log.d(TAG, "DocumentSnapshot successfully written!");
-                                            }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                            if (importedPassword.password != null || importedPassword.note != null) {
+                                                newFields.put("password", importedPassword.password == null ? "" : importedPassword.password);
+                                                newFields.put("note", importedPassword.note == null ? "" : importedPassword.note);
+                                                mFirestore.collection("passwords").document(inList.valueAt(0)).set(newFields).addOnSuccessListener(aVoid -> {
+                                                    numModified[0]++;
+                                                    if (numModified[0] == mImportedPasswords.size()) {
+                                                        // refresh list
+                                                        startActivity(PasswordList.createIntent(mContext, null, mMasterPassword, null, null, null, null));
+                                                        finish();
+                                                    }
+                                                    Log.d(TAG, "DocumentSnapshot successfully written!");
+                                                }).addOnFailureListener(e -> Log.w(TAG, "Error writing document", e));
+                                            }
                                             break;
                                         case 2: // password is entirely new
                                             Map<String, Object> newPassword = new HashMap<>();
@@ -1386,20 +1400,6 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         invalidateOptionsMenu();
     }
 
-    // add zeroes to password, or remove characters, to make it 32 chars long
-    private String make32CharsLong(String password) {
-        // make sure master password is correct length
-        StringBuilder sb = new StringBuilder();
-        sb.append(password);
-        while (sb.length() < MASTER_PASSWORD_LENGTH) {
-            sb.append("0");
-        }
-        while (sb.length() > MASTER_PASSWORD_LENGTH) {
-            sb.delete(sb.length() - 1, sb.length());
-        }
-        return sb.toString();
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -1421,17 +1421,9 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
         mFirestore = FirebaseFirestore.getInstance();
         Bundle extras = getIntent().getExtras();
         if (extras != null) {
-            String masterPassword = extras.getString(EXTRA_MASTER_PASSWORD);
+            mMasterPassword = extras.getString(EXTRA_MASTER_PASSWORD);
 
-            if (masterPassword != null) {
-                mMasterPassword = make32CharsLong(masterPassword);
-            }
-
-            String changedMasterPassword = extras.getString(EXTRA_CHANGED_MASTER_PASSWORD);
-
-            if (changedMasterPassword != null) {
-                mChangedMasterPassword = make32CharsLong(changedMasterPassword);
-            }
+            mChangedMasterPassword = extras.getString(EXTRA_CHANGED_MASTER_PASSWORD);
 
             mImportedPasswords = extras.getParcelableArrayList(EXTRA_IMPORTED_PASSWORDS);
 
@@ -1581,13 +1573,16 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     public void onNothingSelected(AdapterView<?> adapterView) {    }
 
     // generates an AES key
-    private SecretKeySpec generateKey(String password) throws Exception{
-        byte[] keyBytes = new byte[32];
+    private SecretKey generateKey(String password, byte[] salt) throws Exception{
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, PasswordList.PBKDF2_ITERATIONS, PasswordList.HASH_BYTES * 8);
+        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        return skf.generateSecret(spec);
+        /*byte[] keyBytes = new byte[32];
         Arrays.fill(keyBytes, (byte) 0x0);
         byte[] passwordBytes = password.getBytes("UTF-8");
         int length = Math.min(passwordBytes.length, keyBytes.length);
         System.arraycopy(passwordBytes, 0, keyBytes, 0, length);
-        return new SecretKeySpec(keyBytes, "GCM");
+        return new SecretKeySpec(keyBytes, "GCM");*/
     }
 
     @Override
@@ -1660,7 +1655,8 @@ public class PasswordList extends AppCompatActivity implements AdapterView.OnIte
     // clear password from clipboard (if there is any) when app is killed
     @Override
     protected void onDestroy() {
-        if (!(mClipMan.getPrimaryClip().getItemAt(0).getText().toString().isEmpty())) {
+        ClipData clipData = mClipMan.getPrimaryClip();
+        if (clipData != null && !clipData.getItemAt(0).getText().toString().isEmpty()) {
             mClipMan.setPrimaryClip(ClipData.newPlainText("copied_password", ""));
             Toast.makeText(mContext, "Password has been cleared from clipboard.", Toast.LENGTH_LONG).show();
         }

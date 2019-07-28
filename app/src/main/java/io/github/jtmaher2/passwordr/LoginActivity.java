@@ -8,11 +8,14 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.MainThread;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.LoaderManager;
-import android.support.v7.app.AppCompatActivity;
+
+import androidx.annotation.MainThread;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
+
 import android.view.View;
 import android.widget.EditText;
 
@@ -143,17 +146,17 @@ public class LoginActivity extends AppCompatActivity implements LoaderManager.Lo
 
     @NonNull
     @Override
-    public android.support.v4.content.Loader<Cursor> onCreateLoader(int i, @Nullable Bundle bundle) {
+    public Loader<Cursor> onCreateLoader(int i, @Nullable Bundle bundle) {
         return null;
     }
 
     @Override
-    public void onLoadFinished(@NonNull android.support.v4.content.Loader<Cursor> loader, Cursor cursor) {
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
 
     }
 
     @Override
-    public void onLoaderReset(@NonNull android.support.v4.content.Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
 
     }
 }

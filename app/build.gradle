@@ -35,19 +35,17 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
     implementation 'com.firebaseui:firebase-ui-auth:4.1.0'
-    implementation 'com.google.firebase:firebase-firestore:17.1.1'
+    implementation 'com.firebaseui:firebase-ui-database:4.1.0'
+    implementation 'com.google.firebase:firebase-firestore:20.2.0'
     // Required only if Facebook login support is required
     // Find the latest Facebook SDK releases here: https://goo.gl/Ce5L94
     implementation 'com.facebook.android:facebook-login:4.32.0'
-    implementation 'com.google.firebase:firebase-core:16.0.4'
-    implementation 'com.google.firebase:firebase-auth:16.0.5'
-    implementation 'com.google.android.gms:play-services-auth:16.0.1'
+    implementation 'com.google.firebase:firebase-core:17.0.1'
+    implementation 'com.google.firebase:firebase-auth:18.1.0'
+    implementation 'com.google.android.gms:play-services-auth:17.0.0'
     // Required only if Twitter login support is required
     // Find the latest Twitter SDK releases here: https://goo.gl/E5wZvQ
     implementation('com.twitter.sdk.android:twitter-core:3.1.1@aar') { transitive = true }
-    // butterknife
-    implementation 'com.jakewharton:butterknife:8.8.1'
-    annotationProcessor 'com.jakewharton:butterknife-compiler:8.8.1'
 }
 
 apply plugin: 'com.google.gms.google-services'
